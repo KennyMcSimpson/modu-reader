@@ -1,0 +1,2 @@
+rehype-katex 7.0.1
+License: "MIT"

@@ -1,0 +1,2 @@
+fastdom 1.0.12
+License: "MIT"

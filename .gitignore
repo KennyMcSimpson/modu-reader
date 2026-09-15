@@ -1,0 +1,11 @@
+source/node_modules/
+source/dist/
+*.tsbuildinfo
+.sites-runtime/
+.env
+.env.*
+!.env.example
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/

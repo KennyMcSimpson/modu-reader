@@ -1,0 +1,75 @@
+墨读 MoDu Reader · 本地 Markdown 阅读器 / Local Markdown Reader
+
+【中文】
+
+如何使用
+1. 把整个仓库或发布压缩包解压到任意文件夹。
+2. 双击根目录的「墨读.html」，用 Edge、Chrome、Firefox 等桌面浏览器打开。
+3. 点击「打开文件」，或把 .md 文件直接拖入窗口。
+
+不需要注册或登录，不需要安装 Node.js、Python 或其他开发工具。
+不要直接在压缩包预览窗口中运行，请先解压。
+
+功能
+• 中英双语界面，语言选择会保存在当前浏览器中。
+• 多文件切换、粘贴文本、自动目录、阅读进度、源码视图。
+• 代码高亮与复制、GFM 表格和任务清单、LaTeX 数学公式、Mermaid 图表。
+• 字号、行距、宽度、黑体/宋体、浅色/深色/系统主题、专注模式。
+• 支持 .md / .markdown / .mdown / .txt，以及 UTF-8、带 BOM 的 UTF-16 和 GB18030 中文文本。
+
+本地与离线
+程序、字体、公式和图表组件已包含在 HTML 中，启动与基本阅读不需要联网。
+你的文档只在当前浏览器页面中处理，不会上传。
+网络图片仍需要联网；本地图片可和文档一起拖入，按图片文件名匹配。
+刷新或关闭页面后，要重新打开文档；阅读偏好和语言选择会保存在本浏览器中。
+单个文本文件上限 2 MB，单张图片上限 20 MB。
+
+快捷键
+Ctrl / Command + O：打开文件
+Ctrl / Command + B：显示/收起文件栏
+Ctrl / Command + F：使用浏览器查找
+Esc：退出专注模式
+
+包内文件
+墨读.html：直接使用的完整应用。
+使用说明.txt：本说明。
+示例文档.md：可拖入测试的文档。
+source/：完整的本地版源码，只在需要修改程序时使用。
+THIRD_PARTY_NOTICES/：所用开源组件的版本与许可证。
+
+【English】
+
+How to use
+1. Extract the repository or release archive to any folder.
+2. Double-click 「墨读.html」 in the root folder and open it with Edge, Chrome, Firefox, or another desktop browser.
+3. Choose “Open file”, or drag a .md file into the window.
+
+No account, login, Node.js, Python, or other development tool is required.
+Extract the archive before running it; do not launch the file inside an archive preview window.
+
+Features
+• Chinese and English interface with a locale choice remembered by the browser.
+• Multiple documents, pasted text, automatic table of contents, reading progress, and source view.
+• Code highlighting and copying, GFM tables and task lists, LaTeX math, and Mermaid diagrams.
+• Type size, line height, page width, sans/serif font, light/dark/system theme, and focus mode.
+• .md / .markdown / .mdown / .txt files, plus UTF-8, BOM-marked UTF-16, and GB18030 text.
+
+Local and offline
+The application, fonts, math, and diagram components are bundled in the HTML file, so startup and basic reading work offline.
+Your documents are processed only in the current browser page and are never uploaded.
+Remote images still need a network connection; local images can be dragged in with the document and are matched by filename.
+After a refresh or close, open documents again; reading preferences and locale choice are stored in this browser.
+The limit is 2 MB per text file and 20 MB per image.
+
+Keyboard shortcuts
+Ctrl / Command + O: open files
+Ctrl / Command + B: show or hide the file sidebar
+Ctrl / Command + F: use the browser find command
+Esc: leave focus mode
+
+Package contents
+墨读.html: the complete app for direct use.
+使用说明.txt: this guide.
+示例文档.md: a document for testing.
+source/: the complete local source, only needed when changing the app.
+THIRD_PARTY_NOTICES/: versions and licenses for bundled open-source components.
