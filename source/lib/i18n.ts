@@ -137,7 +137,7 @@ const zh: LocaleCopy = {
   },
   sidebar: {
     reading: "正在阅读", startHere: "从这里开始", emptyTitle: "你的文档会出现在这里", emptyHint: "支持拖入多个文件",
-    localPrivacy: "本地阅读 · 文件不上传", version: "墨读 1.0", sampleNames: {welcome: "欢迎使用墨读", guide: "Markdown 格式速查"},
+    localPrivacy: "本地阅读 · 文件不上传", version: "墨读 2.0", sampleNames: {welcome: "欢迎使用墨读", guide: "Markdown 格式速查"},
   },
   breadcrumb: {guide: "阅读指南", documents: "我的文档"},
   tabs: {read: "阅读", source: "源码", aria: "文档显示模式"},
@@ -183,7 +183,7 @@ const en: LocaleCopy = {
   },
   sidebar: {
     reading: "Reading", startHere: "Start here", emptyTitle: "Your documents will appear here", emptyHint: "Drop in multiple files",
-    localPrivacy: "Local reading · No uploads", version: "MoDu 1.0", sampleNames: {welcome: "Welcome to MoDu", guide: "Markdown quick reference"},
+    localPrivacy: "Local reading · No uploads", version: "MoDu 2.0", sampleNames: {welcome: "Welcome to MoDu", guide: "Markdown quick reference"},
   },
   breadcrumb: {guide: "Reading guide", documents: "My documents"},
   tabs: {read: "Read", source: "Source", aria: "Document display mode"},

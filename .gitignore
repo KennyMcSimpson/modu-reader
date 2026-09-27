@@ -9,3 +9,5 @@ source/dist/
 Thumbs.db
 .idea/
 .vscode/
+release/
+source/test-results/

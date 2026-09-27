@@ -4,7 +4,7 @@ import { copyText } from "@/lib/clipboard";
 
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { flushSync } from "react-dom";
-import { BookOpen, PanelLeft, FileText, FolderOpen, Plus, ClipboardPaste, Sun, Moon, Monitor, Maximize2, Minimize2, List, ArrowUp, ChevronRight, X, FileCode2, Clock3, AlignLeft, Keyboard, LockKeyhole, Loader2, Languages } from "lucide-react";
+import { BookOpen, PanelLeft, FileText, FolderOpen, Plus, ClipboardPaste, Sun, Moon, Monitor, Maximize2, Minimize2, List, ArrowUp, ChevronRight, X, FileCode2, Clock3, AlignLeft, Keyboard, LockKeyhole, Loader2, Languages, Search, RefreshCw } from "lucide-react";
 import { toast, Toaster } from "sonner";
 import { SidebarProvider, Sidebar, SidebarHeader, SidebarContent, SidebarFooter, SidebarMenu, SidebarMenuItem, SidebarMenuButton, SidebarMenuAction, useSidebar } from "@/components/ui/sidebar";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
@@ -17,11 +17,13 @@ import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { desktop, type NativeAction } from "@/lib/desktop";
+import { DesktopFind } from "@/components/desktop-find";
 import { MarkdownDocument } from "@/components/markdown-document";
 import { welcome, formatGuide } from "@/lib/demo";
 import { copies, getInitialLocale, localeStorageKey, type Locale, type LocaleCopy } from "@/lib/i18n";
 
-type Doc = { id: string; name: string; content: string; sample?: boolean; encoding?: string; };
+type Doc = { id: string; name: string; content: string; sample?: boolean; encoding?: string; nativeId?: string; path?: string; };
 type Heading = {id: string; title: string; level: number};
 type Preferences = {theme: "light" | "dark" | "system"; size: number; line: number; width: string; font: string};
 const initial: Preferences = {theme: "light", size: 17, line: 1.95, width: "comfortable", font: "sans"};
@@ -64,6 +66,7 @@ function ReaderApp() {
   const [pasteName, setPasteName] = useState("");
   const [pasteText, setPasteText] = useState("");
   const [tocOpen, setTocOpen] = useState(false);
+  const [findOpen, setFindOpen] = useState(false);
   const [assets, setAssets] = useState<Record<string, string>>({});
   const fileInput = useRef<HTMLInputElement>(null);
   const article = useRef<HTMLElement>(null);
@@ -151,10 +154,14 @@ function ReaderApp() {
     } finally { importing.current = false; setBusy(false); }
   }, [activeId, copy, setOpenMobile]);
 
+  const chooseFiles = useCallback(() => {
+    if (desktop) void desktop.openFiles().catch(error => toast.error(String(error)));
+    else fileInput.current?.click();
+  }, []);
   const toggleFocus = useCallback(() => {setFocus(!focus); setOpen(focus); setOpenMobile(false);}, [focus, setOpen, setOpenMobile]);
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "o") {e.preventDefault(); fileInput.current?.click();}
+      if (!desktop && (e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "o") {e.preventDefault(); fileInput.current?.click();}
       if (e.key === "Escape" && focus) {setFocus(false); setOpen(true);}
     };
     window.addEventListener("keydown", onKey);
@@ -210,6 +217,44 @@ function ReaderApp() {
     if (id === activeId) {setActiveId(next[0]?.id || "welcome"); setMode("read");}
     delete positions.current[id];
   };
+  const nativeActions = useRef<(action: NativeAction) => void>(() => {});
+  nativeActions.current = action => {
+    if (action === "paste") setPasteOpen(true);
+    if (action === "find") setFindOpen(true);
+    if (action === "focus") toggleFocus();
+    if (action === "close") closeDoc(activeId);
+    if (action === "reload") {
+      if (doc.nativeId) {
+        if (scrollArea.current) positions.current[activeId] = scrollArea.current.scrollTop;
+        void desktop?.reloadFile(doc.nativeId).catch(error => toast.error(String(error)));
+      } else toast.info(locale === "en" ? "Open a local file to reload it." : "打开本地文件后，可以重新读取。 ");
+    }
+  };
+  const activeIdRef = useRef(activeId);
+  activeIdRef.current = activeId;
+  useEffect(() => {
+    if (!desktop) return;
+    const unsubscribeDocuments = desktop.onDocuments(batch => {
+      if (!batch.length) return;
+      if (scrollArea.current) positions.current[activeIdRef.current] = scrollArea.current.scrollTop;
+      const incoming = batch.map(item => ({...item, nativeId: item.id}));
+      setDocuments(old => {
+        const next = [...old];
+        for (const item of incoming) {
+          const index = next.findIndex(existing => existing.id === item.id);
+          if (index < 0) next.push(item); else next[index] = item;
+        }
+        return next;
+      });
+      setActiveId(incoming[0].id); setMode("read"); setOpenMobile(false);
+    });
+    const unsubscribeActions = desktop.onAction(action => nativeActions.current(action));
+    const unsubscribeErrors = desktop.onError(message => toast.error(message));
+    void desktop.ready().catch(error => toast.error(String(error)));
+    return () => { unsubscribeDocuments(); unsubscribeActions(); unsubscribeErrors(); };
+  }, [setOpenMobile]);
+  useEffect(() => { void desktop?.setLocale(locale).catch(() => {}); }, [locale]);
+
   const openText = useCallback((content: string, name: string = "") => {
     if (!content.trim()) throw new Error(copy.errors.emptyPaste);
     if (new Blob([content]).size > 2 * 1024 * 1024) throw new Error(copy.errors.pasteTooLarge);
@@ -250,17 +295,17 @@ function ReaderApp() {
 
   const toc = <nav aria-label={copy.toc.title} className="toc-links">{headings.length ? headings.map(h => <button key={h.id} className={`toc-link level-${h.level} ${activeHeading === h.id ? "current" : ""}`} style={{paddingLeft: `${Math.max(0, h.level - 2) * 12 + 16}px`}} onClick={() => jumpTo(h.id)} title={h.title}>{h.title}</button>) : <p className="toc-empty">{mode === "source" ? copy.toc.sourceHint : copy.toc.empty}</p>}</nav>;
 
-  return <div className={`reader-app ${focus ? "focus-mode" : ""}`} onDragEnter={e => {if (e.dataTransfer.types.includes("Files")) {e.preventDefault(); depth.current++; setDragging(true);}}} onDragLeave={e => {e.preventDefault(); depth.current--; if (depth.current <= 0) setDragging(false);}} onDragOver={e => {if (e.dataTransfer.types.includes("Files")) {e.preventDefault(); e.dataTransfer.dropEffect = "copy";}}} onDrop={e => {e.preventDefault(); depth.current = 0; setDragging(false); void openFiles(Array.from(e.dataTransfer.files));}}>
+  return <div className={`reader-app ${focus ? "focus-mode" : ""}`} onDragEnter={e => {if (e.dataTransfer.types.includes("Files")) {e.preventDefault(); depth.current++; setDragging(true);}}} onDragLeave={e => {e.preventDefault(); depth.current--; if (depth.current <= 0) setDragging(false);}} onDragOver={e => {if (e.dataTransfer.types.includes("Files")) {e.preventDefault(); e.dataTransfer.dropEffect = "copy";}}} onDrop={e => {e.preventDefault(); depth.current = 0; setDragging(false); if (!desktop) void openFiles(Array.from(e.dataTransfer.files));}}>
     <input ref={fileInput} type="file" accept={accepted} multiple className="sr-only" aria-label={copy.aria.fileInput} onChange={e => {void openFiles(Array.from(e.target.files || [])); e.target.value = "";}} />
     <Sidebar className="file-sidebar">
       <SidebarHeader className="brand-area">
         <div className="brand"><div className="brand-symbol"><BookOpen size={22} strokeWidth={1.6} /><span /></div><div><strong>{copy.brand.name}<span className="brand-dot">.</span></strong><small>{copy.brand.english}</small><em>{copy.brand.descriptor}</em></div><button className="mobile-close icon-button" onClick={() => setOpenMobile(false)} aria-label={copy.actions.closeSidebar}><X size={18} /></button></div>
-        <Button className="open-file-button" onClick={() => fileInput.current?.click()} disabled={busy}>{busy ? <Loader2 className="animate-spin" size={17} /> : <Plus size={18} />}<span>{busy ? copy.actions.readingFile : copy.actions.openFile}</span><kbd>⌘ / Ctrl O</kbd></Button>
+        <Button className="open-file-button" onClick={chooseFiles} disabled={busy}>{busy ? <Loader2 className="animate-spin" size={17} /> : <Plus size={18} />}<span>{busy ? copy.actions.readingFile : copy.actions.openFile}</span><kbd>{desktop ? "Ctrl O" : "⌘ / Ctrl O"}</kbd></Button>
         <button className="paste-button" onClick={() => setPasteOpen(true)}><ClipboardPaste size={16} />{copy.actions.pasteText}</button>
       </SidebarHeader>
       <SidebarContent className="file-list-area">
         <div className="section-label">{copy.sidebar.reading}<span>{documents.filter(d => !d.sample).length}</span></div>
-        <SidebarMenu>{documents.filter(d => !d.sample).map(d => <SidebarMenuItem key={d.id}><SidebarMenuButton className="file-item" isActive={d.id === activeId} onClick={() => selectDoc(d.id)} title={d.name}><FileText size={17} /><span>{d.name}</span></SidebarMenuButton><SidebarMenuAction className="file-close" showOnHover onClick={() => closeDoc(d.id)} aria-label={copy.actions.closeDocument(d.name)}><X size={13} /></SidebarMenuAction></SidebarMenuItem>)}</SidebarMenu>
+        <SidebarMenu>{documents.filter(d => !d.sample).map(d => <SidebarMenuItem key={d.id}><SidebarMenuButton className="file-item" isActive={d.id === activeId} onClick={() => selectDoc(d.id)} title={d.path || d.name}><FileText size={17} /><span>{d.name}</span></SidebarMenuButton><SidebarMenuAction className="file-close" showOnHover onClick={() => closeDoc(d.id)} aria-label={copy.actions.closeDocument(d.name)}><X size={13} /></SidebarMenuAction></SidebarMenuItem>)}</SidebarMenu>
         {!documents.some(d => !d.sample) && <div className="files-empty"><FolderOpen size={24} strokeWidth={1.25} /><p>{copy.sidebar.emptyTitle}</p><span>{copy.sidebar.emptyHint}</span></div>}
         <div className="section-label sample-label">{copy.sidebar.startHere}</div>
         <SidebarMenu>{documents.filter(d => d.sample).map(d => <SidebarMenuItem key={d.id}><SidebarMenuButton className="file-item sample-file" isActive={d.id === activeId} onClick={() => selectDoc(d.id)} title={d.name}>{d.id === "welcome" ? <BookOpen size={17} /> : <FileCode2 size={17} />}<span>{d.id === "welcome" ? copy.sidebar.sampleNames.welcome : copy.sidebar.sampleNames.guide}</span>{d.id === activeId && <span className="active-mark" />}</SidebarMenuButton></SidebarMenuItem>)}</SidebarMenu>
@@ -279,17 +324,20 @@ function ReaderApp() {
           <div className="reading-tools">
             <TabsList className="view-tabs" aria-label={copy.tabs.aria}><TabsTrigger value="read"><BookOpen size={15} /><span>{copy.tabs.read}</span></TabsTrigger><TabsTrigger value="source"><FileCode2 size={15} /><span>{copy.tabs.source}</span></TabsTrigger></TabsList>
             <span className="tools-divider" />
+            {desktop && <IconButton label={locale === "en" ? "Find text (Ctrl+F)" : "查找文字 (Ctrl+F)"} active={findOpen} onClick={() => setFindOpen(!findOpen)}><Search size={17} /></IconButton>}
+            {doc.nativeId && <IconButton label={locale === "en" ? "Reload file (F5)" : "重新读取文件 (F5)"} onClick={() => nativeActions.current("reload")}><RefreshCw size={16} /></IconButton>}
             <Popover><PopoverTrigger asChild><button className="type-trigger icon-button" aria-label={copy.actions.settings}>Aa</button></PopoverTrigger><PopoverContent className="reader-settings" align="end"><h2>{copy.settings.title}</h2><div className="setting-label"><span>{copy.settings.fontSize}</span><span>{preferences.size}px</span></div><Slider aria-label={copy.settings.bodyFontSize} min={14} max={24} step={1} value={[preferences.size]} onValueChange={([size]) => setPreferences(p => ({...p, size}))} /><div className="setting-label"><span>{copy.settings.lineHeight}</span><span>{preferences.line.toFixed(2)}</span></div><Slider aria-label={copy.settings.bodyLineHeight} min={1.5} max={2.4} step={0.05} value={[preferences.line]} onValueChange={([line]) => setPreferences(p => ({...p, line}))} /><div className="setting-row"><label htmlFor="font-choice">{copy.settings.font}</label><Select value={preferences.font} onValueChange={font => setPreferences(p => ({...p, font}))}><SelectTrigger id="font-choice"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="sans">{copy.settings.fonts.sans}</SelectItem><SelectItem value="serif">{copy.settings.fonts.serif}</SelectItem></SelectContent></Select></div><div className="setting-row"><label htmlFor="width-choice">{copy.settings.width}</label><Select value={preferences.width} onValueChange={width => setPreferences(p => ({...p, width}))}><SelectTrigger id="width-choice"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="compact">{copy.settings.widths.compact}</SelectItem><SelectItem value="comfortable">{copy.settings.widths.comfortable}</SelectItem><SelectItem value="wide">{copy.settings.widths.wide}</SelectItem></SelectContent></Select></div><div className="setting-row"><label htmlFor="theme-choice">{copy.settings.theme}</label><Select value={preferences.theme} onValueChange={(theme: Preferences["theme"]) => setPreferences(p => ({...p, theme}))}><SelectTrigger id="theme-choice"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="light">{copy.settings.themes.light}</SelectItem><SelectItem value="dark">{copy.settings.themes.dark}</SelectItem><SelectItem value="system">{copy.settings.themes.system}</SelectItem></SelectContent></Select></div><button className="reset-settings" onClick={() => setPreferences(initial)}>{copy.settings.reset}</button></PopoverContent></Popover>
             <IconButton label={focus ? copy.actions.exitFocus : copy.actions.focus} active={focus} onClick={toggleFocus}>{focus ? <Minimize2 size={17} /> : <Maximize2 size={17} />}</IconButton>
             <Popover open={tocOpen} onOpenChange={setTocOpen}><PopoverTrigger asChild><button className="icon-button mobile-toc" aria-label={copy.actions.toc}><List size={18} /></button></PopoverTrigger><PopoverContent align="end" className="mobile-toc-popover"><h2>{copy.toc.title}</h2>{toc}</PopoverContent></Popover>
           </div>
         </header>
+        {desktop && findOpen && <DesktopFind locale={locale} documentId={doc.id} onClose={() => setFindOpen(false)} />}
         <div className="content-layout">
           <div className="document-scroll" ref={scrollArea}>
             <div className={`document-inner width-${preferences.width}`} style={{"--reading-size": `${preferences.size / 16}rem`, "--reading-line": preferences.line} as CSSProperties}>
               <div className="document-meta"><span className="document-kind">{doc.sample ? copy.stats.sampleKind : copy.stats.markdownKind}</span><span className="meta-rule" /><span><Clock3 size={13} />{copy.stats.minutes(stats.minutes)}</span><span>{copy.stats.words(stats.count)}</span>{!doc.sample && <span className="local-badge">{copy.stats.localDocument}</span>}</div>
               <TabsContent value="read" className="reading-panel">
-                {doc.content.trim() ? <article className={`markdown-body font-${preferences.font}`} ref={article}><MarkdownDocument content={doc.content} dark={dark} assets={assets} onLink={handleLink} locale={locale} /></article> : <article ref={article} className="empty-document"><FileText size={34} strokeWidth={1.2} /><h1>{copy.empty.title}</h1><p>{copy.empty.description}</p><Button onClick={() => fileInput.current?.click()}>{copy.actions.openFileShort}</Button></article>}
+                {doc.content.trim() ? <article className={`markdown-body font-${preferences.font}`} ref={article}><MarkdownDocument documentId={doc.nativeId} content={doc.content} dark={dark} assets={assets} onLink={handleLink} locale={locale} /></article> : <article ref={article} className="empty-document"><FileText size={34} strokeWidth={1.2} /><h1>{copy.empty.title}</h1><p>{copy.empty.description}</p><Button onClick={chooseFiles}>{copy.actions.openFileShort}</Button></article>}
                 <div className="document-end"><span /><BookOpen size={15} /><span /></div><p className="end-note">{copy.stats.end}</p>
               </TabsContent>
               <TabsContent value="source" className="source-panel"><div className="source-heading"><span>{copy.stats.sourceTitle}</span><button onClick={async () => {try {await copyText(doc.content); toast.success(copy.success.copied);} catch {toast.error(copy.errors.copyFailed);}}}>{copy.actions.copyAll}</button></div><pre tabIndex={0} aria-label={copy.aria.source}>{doc.content || copy.empty.source}</pre></TabsContent>

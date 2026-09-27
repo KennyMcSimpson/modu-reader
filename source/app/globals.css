@@ -343,3 +343,9 @@ button:focus-visible, a:focus-visible, summary:focus-visible { outline: 2px soli
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { scroll-behavior: auto !important; transition-duration: .01ms !important; animation-duration: .01ms !important; }
 }
+
+/* Desktop find sits below the toolbar; it never covers the document. */
+.desktop-find { display: flex; align-items: center; justify-content: flex-end; gap: 7px; padding: 8px 24px; border-bottom: 1px solid var(--border); flex-shrink: 0; color: var(--muted-foreground); }
+.desktop-find input { width: min(260px, 30vw); height: 30px; padding: 0 8px; border: 1px solid var(--border); border-radius: 5px; background: var(--background); color: var(--foreground); outline-offset: 2px; font-size: 13px; }
+.find-count { font-size: 12px; min-width: 46px; text-align: center; font-variant-numeric: tabular-nums; }
+.desktop-find button:disabled { opacity: .35; }

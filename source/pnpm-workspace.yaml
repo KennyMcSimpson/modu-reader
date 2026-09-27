@@ -4,6 +4,8 @@ minimumReleaseAgeIgnoreMissingTime: false
 trustLockfile: false
 strictDepBuilds: true
 allowBuilds:
+  electron: true
+  electron-winstaller: false
   esbuild: true
   fsevents: true
   sharp: true

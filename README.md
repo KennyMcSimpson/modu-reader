@@ -1,78 +1,86 @@
 # 墨读 MoDu Reader
 
-> A calm, local-first Markdown reader for notes, long-form writing, and technical documents.
+[![Windows desktop](https://github.com/KennyMcSimpson/modu-reader/actions/workflows/windows-release.yml/badge.svg)](https://github.com/KennyMcSimpson/modu-reader/actions/workflows/windows-release.yml)
+[![Latest release](https://img.shields.io/github/v/release/KennyMcSimpson/modu-reader)](https://github.com/KennyMcSimpson/modu-reader/releases/latest)
 
-墨读是一款打开即用的本地 Markdown 阅读器：不需要注册，不上传文件，也不要求安装 Node.js。把文件拖进窗口，专心读内容。
+一款专注阅读的 **Windows 桌面 Markdown 应用**。独立窗口、本地文件、打开即读；无需注册、浏览器或开发环境。
 
-MoDu Reader is a local-first Markdown reader for notes, long-form writing, and technical documents. It works offline as a single HTML file, with no account, upload, or server required.
+A calm **Windows desktop Markdown reader**. A standalone application for local documents, with no account, browser, or development environment required.
 
-## 立即使用 · Use It Now
+## 下载 · Download
 
-1. 下载或克隆这个仓库。
-2. 双击根目录的 `墨读.html`。
-3. 用 Edge、Chrome 或 Firefox 打开，然后点击“打开文件”，或把 Markdown 文件直接拖进窗口。
+**[下载最新版 / Latest release](https://github.com/KennyMcSimpson/modu-reader/releases/latest)** · Windows 10 / 11，64 位 x64
 
-1. Download or clone this repository.
-2. Double-click the root-level `墨读.html` file.
-3. Open it in Edge, Chrome, or Firefox. Choose **Open file**, or drag Markdown files into the window.
+| 文件 / File | 用法 / How to use |
+| --- | --- |
+| [免安装 ZIP / Portable ZIP](https://github.com/KennyMcSimpson/modu-reader/releases/latest/download/MoDu-Reader-2.0.0-Windows-x64.zip) | 完整解压，双击 `MoDu Reader.exe`。可直接把整个 ZIP 发给朋友。 / Extract everything, then launch `MoDu Reader.exe`. Share the entire ZIP. |
+| [安装包 / Installer](https://github.com/KennyMcSimpson/modu-reader/releases/latest/download/MoDu-Reader-2.0.0-Setup-x64.exe) | 安装后从桌面或开始菜单打开。 / Install and launch from the desktop or Start menu. |
 
-不需要 Node.js、Python、安装步骤或网络连接。网络图片仍需要网络；文档文本只在当前浏览器页面中处理。
+免安装版的 EXE 需要旁边的运行文件，请勿单独移动 EXE，也不要在压缩包预览中直接运行。**GitHub 的 Code → Download ZIP 是源码，不是可运行的 Windows 安装包。**
 
-No Node.js, Python, installation step, or network connection is required. Remote images still need a network connection; document text is processed only in the current browser page.
+Keep the portable EXE together with all neighboring files. Extract it before running. **GitHub’s Code → Download ZIP contains source code, not the Windows application.**
+
+当前安装包未进行商业代码签名，Windows 可能显示“未知发布者”。发布页提供 SHA-256 校验文件。 / The builds are unsigned; Windows may show an unknown publisher. SHA-256 checksums are included in each release.
+
+## 开始阅读 · Start reading
+
+1. 打开程序后，点击 **打开文件**、按 **Ctrl+O**，或拖入 Markdown 文件。
+2. 安装版可在文件右键菜单的 **打开方式** 中选择 **MoDu Reader**；设为默认后，双击 `.md` 就能打开。
+3. **Ctrl+F** 查找、**F5** 重新读取外部修改、**Ctrl+Shift+F** 切换专注模式。
+4. **文件 → 最近打开** 可重新打开文档；右下角 **中 / EN** 切换界面语言。
+
+1. Choose **Open file**, press **Ctrl+O**, or drag Markdown files into the window.
+2. With the installed version, choose **MoDu Reader** in Windows **Open with**. Set it as the default if you want to open `.md` files by double-clicking.
+3. **Ctrl+F** finds text; **F5** reloads changes made in another editor; **Ctrl+Shift+F** toggles focus mode.
+4. Use **File → Open recent** to reopen documents, and **中 / EN** to change the UI language.
 
 ## 功能 · Features
 
-- 中英双语界面，语言选择会保存在当前浏览器中 / Chinese and English UI with a persisted locale choice
-- 多文件切换、拖放打开、粘贴 Markdown / multiple documents, drag-and-drop, and paste-to-read
-- GFM 表格、任务清单、代码高亮与复制 / GFM tables, task lists, syntax highlighting, and code copying
-- LaTeX 数学公式与 Mermaid 图表 / LaTeX math and Mermaid diagrams
-- 目录、阅读进度、源码视图、专注模式 / table of contents, reading progress, source view, and focus mode
-- 字号、行距、字体、正文宽度与浅色/深色/系统主题 / type size, line height, font, page width, and light/dark/system themes
-- 支持 `.md`、`.markdown`、`.mdown`、`.txt`，以及 UTF-8、UTF-16 BOM、GB18030 文本 / supported Markdown and text formats with common Chinese encodings
-- 本地图片匹配与完全离线的单文件构建 / local image matching and a fully offline single-file build
+- 系统文件对话框、多文档切换、拖放、粘贴阅读、命令行打开 / Native file dialog, multiple documents, drag-and-drop, pasted text, command-line opening
+- 最近打开记录、窗口位置记忆、系统文件“打开方式” / Recent files, remembered window bounds, Windows file integration
+- 目录导航、查找、阅读进度、源码视图与专注模式 / Contents navigation, find, reading progress, source view, focus mode
+- 中英界面、字体与排版调整、浅色/深色/系统主题 / Chinese and English UI, typography settings, light/dark/system themes
+- GFM 表格、任务列表、代码高亮与复制 / GFM tables, task lists, syntax highlighting and copying
+- LaTeX 数学公式和 Mermaid 图表，所需组件随应用附带 / Bundled LaTeX math and Mermaid diagrams
+- 自动显示文档同目录或子目录中的相对路径图片 / Relative images inside the document’s own directory or its subdirectories
+- `.md`、`.markdown`、`.mdown`、`.txt`；UTF-8、带 BOM 的 UTF-16、GB18030 / Markdown and text files in common encodings
+
+单个文档上限 2 MB，本地图片上限 20 MB；不读取文档文件夹以外的图片。网络图片仍需联网，外部网页链接由系统默认浏览器打开。墨读是阅读器，不会修改原文件。
+
+Documents are limited to 2 MB and local images to 20 MB. Images outside the document folder are not read. Remote images need a network connection; external links open in your default browser. MoDu is a reader and does not modify source documents.
 
 ## 隐私 · Privacy
 
-墨读不会上传你的文档。文件内容、粘贴文本和本地图片只保存在当前页面的内存中；刷新或关闭页面后，需要重新打开文档。只有阅读偏好和语言选择会保存在浏览器的本地存储中。
+文档与粘贴文本在本机内存中处理，不上传、不遥测、无账号。主题、语言、窗口位置及最近文件的路径保存在本机应用数据目录；最近文件记录可以从菜单清空。关闭应用后不会保存文档正文或粘贴内容。免安装版也会使用当前 Windows 用户的应用数据目录保存这些设置。
 
-MoDu Reader does not upload your documents. File contents, pasted text, and local images stay in the current page's memory; after a refresh or close, open them again. Only reading preferences and locale choice are stored in the browser's local storage.
+Documents and pasted text are processed locally in memory. There are no uploads, accounts, or analytics. Preferences, language, window bounds, and recent file paths are stored in local application data; clear recent paths from the File menu. Document text and pasted content are not saved on exit. The portable version also stores settings in the current Windows user’s application data directory.
 
-## 从源码运行 · Develop From Source
+## 开发与构建 · Development
 
-需要 Node.js `>=22.13.0` 和 pnpm `11.25.0`。完整命令、目录说明和离线构建步骤见 [`source/README.md`](source/README.md)。
+桌面外壳使用 Electron，阅读界面使用 React/Vite；程序自带运行环境。源码使用 Node.js 24 与 pnpm 11.25.0。正常使用只需下载上面的 Windows 成品。
 
-The source project requires Node.js `>=22.13.0` and pnpm `11.25.0`. See [`source/README.md`](source/README.md) for commands, file responsibilities, and the offline build.
+The desktop shell uses Electron and the reader UI uses React/Vite. The runtime is bundled. Development requires Node.js 24 and pnpm 11.25.0; end users only need the release downloads.
 
 ```sh
 cd source
 pnpm install --frozen-lockfile
-pnpm run dev
 pnpm run typecheck
-pnpm run build
+pnpm test
+pnpm run dev
+# 在 Windows 上生成 ZIP 与安装包 / Build Windows packages on Windows:
+pnpm run dist:win
 ```
 
-`pnpm run build` 会生成 `source/dist/墨读.html`。发布时，构建结果会被复制到根目录的 `墨读.html`，让不使用 Node.js 的读者也能直接打开。
+构建产物位于根目录的 `release/`。GitHub Actions 在 Windows 上构建，验证解压后的 EXE 和安装后的 EXE，通过后发布当前版本；已经发布的同版本文件不会被覆盖。
 
-`pnpm run build` creates `source/dist/墨读.html`. For distribution, copy that build output to the root-level `墨读.html` so readers without Node.js can launch it directly.
+Build outputs go to `release/`. GitHub Actions builds on Windows, tests both the extracted portable EXE and the installed EXE, and publishes the version after successful checks. Published versions are never overwritten.
 
-## 仓库结构 · Repository Layout
-
-- `墨读.html`：可双击运行的离线应用 / the standalone offline application
-- `示例文档.md`：用于测试拖放与 Markdown 渲染的示例 / a sample document for drag-and-drop and rendering checks
-- `source/`：React/Vite 源码 / React/Vite source
-- `使用说明.txt`：面向非开发者的双语使用说明 / bilingual quick-start guide
-- `THIRD_PARTY_NOTICES/`：离线构建中使用的第三方许可证 / third-party licenses used by the offline bundle
+- [`source/README.md`](source/README.md)：源码结构与验证 / source layout and verification
+- [`使用说明.txt`](使用说明.txt)：双语使用说明 / bilingual quick start
+- [`docs/releases/v2.0.0.md`](docs/releases/v2.0.0.md)：2.0 桌面版发布说明 / desktop release notes
+- [`CONTRIBUTING.md`](CONTRIBUTING.md)：贡献指南 / contribution guide
 - [`LICENSE`](LICENSE)：MIT 许可证 / MIT license
-- [`CONTRIBUTING.md`](CONTRIBUTING.md)：贡献与本地验证说明 / contribution and local validation guide
 
-## 许可证 · License
+第三方许可证随 Windows 应用一起分发；Electron / Chromium 的许可证与阅读器组件的 `THIRD_PARTY_NOTICES` 均保留。
 
-本项目采用 MIT License。第三方组件仍受各自许可证约束，详见 [`THIRD_PARTY_NOTICES/`](THIRD_PARTY_NOTICES/)。
-
-This project is released under the MIT License. Third-party components remain subject to their own licenses; see [`THIRD_PARTY_NOTICES/`](THIRD_PARTY_NOTICES/).
-
-## 相关文档 · Documentation
-
-- [使用说明 / Quick Start](使用说明.txt)
-- [源码开发 / Source Development](source/README.md)
-- [贡献指南 / Contributing](CONTRIBUTING.md)
+Third-party licenses are shipped with the Windows app, including Electron / Chromium notices and the renderer’s `THIRD_PARTY_NOTICES` directory.

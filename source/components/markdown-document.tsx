@@ -83,8 +83,8 @@ function DocumentImage({ src, alt, title, labels }: { src?: string; alt?: string
   return <img src={src} alt={alt || labels.imageAlt} title={title} loading="lazy" referrerPolicy="no-referrer" onError={() => setFailed(true)} />;
 }
 
-export const MarkdownDocument = memo(function MarkdownDocument({ content, dark, assets, onLink, locale }: {
-  content: string; dark: boolean; assets: Record<string, string>; onLink: (href: string) => void; locale: Locale;
+export const MarkdownDocument = memo(function MarkdownDocument({ content, dark, assets, onLink, locale, documentId }: {
+  documentId?: string; content: string; dark: boolean; assets: Record<string, string>; onLink: (href: string) => void; locale: Locale;
 }) {
   const labels = copies[locale].renderer;
   const components = useMemo(() => ({
@@ -106,7 +106,7 @@ export const MarkdownDocument = memo(function MarkdownDocument({ content, dark, 
       let decoded = url;
       try {decoded = decodeURIComponent(url);} catch {}
       const name = decoded.split(/[\\/]/).pop()?.split(/[?#]/)[0] || "";
-      return assets[decoded] || assets[name] || "";
+      return assets[decoded] || assets[name] || (documentId && !/^(?:[a-z][a-z\d+.-]*:|[\\/])/i.test(decoded) ? `modu-media://${documentId}/${url}` : "");
     }
     return defaultUrlTransform(url);
   }}>{content}</Markdown>;

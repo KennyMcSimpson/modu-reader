@@ -1,0 +1,46 @@
+appId: io.github.kennymcsimpson.modu
+productName: MoDu Reader
+electronVersion: 44.4.3
+directories:
+  app: dist/app
+  output: ../release
+  buildResources: desktop/assets
+files:
+  - desktop/**/*
+  - dist/desktop/**/*
+  - package.json
+asar: true
+npmRebuild: false
+extraFiles:
+  - from: ../LICENSE
+    to: LICENSE-MoDu.txt
+  - from: ../使用说明.txt
+    to: 使用说明.txt
+  - from: ../示例文档.md
+    to: 示例文档.md
+  - from: dist/THIRD_PARTY_NOTICES
+    to: THIRD_PARTY_NOTICES
+win:
+  executableName: MoDu Reader
+  icon: desktop/assets/icon.ico
+  target:
+    - target: zip
+      arch: [x64]
+    - target: nsis
+      arch: [x64]
+  artifactName: MoDu-Reader-${version}-Windows-${arch}.${ext}
+nsis:
+  artifactName: MoDu-Reader-${version}-Setup-${arch}.${ext}
+  oneClick: false
+  perMachine: false
+  allowElevation: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+  shortcutName: MoDu Reader
+  include: desktop/installer.nsh
+  installerLanguages: [zh_CN, en_US]
+  language: 2052
+  displayLanguageSelector: true
+  deleteAppDataOnUninstall: false
+publish: null

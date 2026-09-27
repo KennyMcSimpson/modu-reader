@@ -1,75 +1,60 @@
-墨读 MoDu Reader · 本地 Markdown 阅读器 / Local Markdown Reader
+墨读 MoDu Reader 2.0 · Windows 桌面版
+=======================================
 
-【中文】
+下载：https://github.com/KennyMcSimpson/modu-reader/releases/latest
+适用：Windows 10 / 11，64 位 x64。
 
-如何使用
-1. 把整个仓库或发布压缩包解压到任意文件夹。
-2. 双击根目录的「墨读.html」，用 Edge、Chrome、Firefox 等桌面浏览器打开。
-3. 点击「打开文件」，或把 .md 文件直接拖入窗口。
+免安装版：完整解压 ZIP 后，双击 MoDu Reader.exe。
+请保留同目录下的全部文件；发给朋友时发整个 ZIP，不要只发 EXE。
+安装版：运行 Setup-x64.exe，安装后从桌面或开始菜单打开。
+两种版本都不需要账号、浏览器、Node.js 或 Python。
 
-不需要注册或登录，不需要安装 Node.js、Python 或其他开发工具。
-不要直接在压缩包预览窗口中运行，请先解压。
+点击“打开文件”或按 Ctrl+O，也可以将 .md 文件拖到窗口。
+安装后可右键 .md 文件 → 打开方式 → MoDu Reader；由你决定是否设为默认。
+Ctrl+F：查找。F5：重新读取文件。Ctrl+Shift+F：专注模式。
+文件 → 最近打开：重新打开最近文档，也可清空记录。
+中 / EN：切换语言。Aa：调整字号、行距、字体和正文宽度。
 
-功能
-• 中英双语界面，语言选择会保存在当前浏览器中。
-• 多文件切换、粘贴文本、自动目录、阅读进度、源码视图。
-• 代码高亮与复制、GFM 表格和任务清单、LaTeX 数学公式、Mermaid 图表。
-• 字号、行距、宽度、黑体/宋体、浅色/深色/系统主题、专注模式。
-• 支持 .md / .markdown / .mdown / .txt，以及 UTF-8、带 BOM 的 UTF-16 和 GB18030 中文文本。
+支持 Markdown 表格、任务列表、代码高亮、LaTeX 数学与 Mermaid 图表。
+支持 .md / .markdown / .mdown / .txt；文档最大 2 MB，图片最大 20 MB。
+相对路径图片须位于文档同目录或子目录，如 images/photo.png。
+网络图片需要联网。外部网页链接用系统默认浏览器打开。
+本应用只读原文件；请使用你喜欢的编辑器修改内容，再按 F5 更新阅读。
 
-本地与离线
-程序、字体、公式和图表组件已包含在 HTML 中，启动与基本阅读不需要联网。
-你的文档只在当前浏览器页面中处理，不会上传。
-网络图片仍需要联网；本地图片可和文档一起拖入，按图片文件名匹配。
-刷新或关闭页面后，要重新打开文档；阅读偏好和语言选择会保存在本浏览器中。
-单个文本文件上限 2 MB，单张图片上限 20 MB。
+文档正文不上传、不持久保存。粘贴文本关闭后不会保留。
+设置、最近文件路径和窗口位置保存在当前用户的本机应用数据目录；
+免安装版同样如此。你可以从菜单清空最近文件记录。
 
-快捷键
-Ctrl / Command + O：打开文件
-Ctrl / Command + B：显示/收起文件栏
-Ctrl / Command + F：使用浏览器查找
-Esc：退出专注模式
+当前构建未进行商业代码签名，Windows 可能显示“未知发布者”。
+发布页提供 SHA256SUMS.txt 供核对下载。
 
-包内文件
-墨读.html：直接使用的完整应用。
-使用说明.txt：本说明。
-示例文档.md：可拖入测试的文档。
-source/：完整的本地版源码，只在需要修改程序时使用。
-THIRD_PARTY_NOTICES/：所用开源组件的版本与许可证。
+---------------------------------------
+English
+---------------------------------------
+MoDu Reader 2.0 is a standalone Windows 10 / 11 x64 desktop app.
 
-【English】
+Portable: extract the ENTIRE ZIP and run MoDu Reader.exe.
+Keep all runtime files together; share the complete ZIP with friends.
+Installer: run Setup-x64.exe, then launch from the desktop or Start menu.
+No account, browser, Node.js, or Python is required.
 
-How to use
-1. Extract the repository or release archive to any folder.
-2. Double-click 「墨读.html」 in the root folder and open it with Edge, Chrome, Firefox, or another desktop browser.
-3. Choose “Open file”, or drag a .md file into the window.
+Ctrl+O opens documents. Drag-and-drop and pasted Markdown are supported.
+The installed app is registered in Windows Open with. You choose the default.
+Ctrl+F: find. F5: reload from disk. Ctrl+Shift+F: focus mode.
+File > Open recent reopens files or clears recent paths.
+Use 中 / EN for language and Aa for typography settings.
 
-No account, login, Node.js, Python, or other development tool is required.
-Extract the archive before running it; do not launch the file inside an archive preview window.
+Tables, task lists, highlighted code, math, and Mermaid are bundled offline.
+Supported: .md / .markdown / .mdown / .txt; documents up to 2 MB.
+Images up to 20 MB must be in the document folder or its subfolders.
+Remote images need a network connection. External links open in your browser.
+The reader never edits your originals. Edit elsewhere, then press F5.
 
-Features
-• Chinese and English interface with a locale choice remembered by the browser.
-• Multiple documents, pasted text, automatic table of contents, reading progress, and source view.
-• Code highlighting and copying, GFM tables and task lists, LaTeX math, and Mermaid diagrams.
-• Type size, line height, page width, sans/serif font, light/dark/system theme, and focus mode.
-• .md / .markdown / .mdown / .txt files, plus UTF-8, BOM-marked UTF-16, and GB18030 text.
+No document uploads or analytics. Document text and pasted content are not
+saved on exit. Preferences, recent paths, and window bounds are stored in
+local application data, including when using the portable edition.
+These builds are unsigned. Windows may show an unknown-publisher notice.
+SHA256SUMS.txt is available on the release page.
 
-Local and offline
-The application, fonts, math, and diagram components are bundled in the HTML file, so startup and basic reading work offline.
-Your documents are processed only in the current browser page and are never uploaded.
-Remote images still need a network connection; local images can be dragged in with the document and are matched by filename.
-After a refresh or close, open documents again; reading preferences and locale choice are stored in this browser.
-The limit is 2 MB per text file and 20 MB per image.
-
-Keyboard shortcuts
-Ctrl / Command + O: open files
-Ctrl / Command + B: show or hide the file sidebar
-Ctrl / Command + F: use the browser find command
-Esc: leave focus mode
-
-Package contents
-墨读.html: the complete app for direct use.
-使用说明.txt: this guide.
-示例文档.md: a document for testing.
-source/: the complete local source, only needed when changing the app.
-THIRD_PARTY_NOTICES/: versions and licenses for bundled open-source components.
+Source and issues: https://github.com/KennyMcSimpson/modu-reader
+License: MIT. See LICENSE-MoDu.txt and THIRD_PARTY_NOTICES.
