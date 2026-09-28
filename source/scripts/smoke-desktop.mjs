@@ -41,6 +41,7 @@ try {
   await app.evaluate(({ Menu }) => Menu.getApplicationMenu().getMenuItemById('find').click());
   await page.locator('.desktop-find input').fill('SearchNeedle');
   await page.waitForFunction(() => /1\s*\/\s*2/.test(document.querySelector('.find-count')?.textContent || ''));
+  assert.equal(await page.evaluate(() => CSS.highlights.get('modu-find').size), 2);
   await page.locator('.desktop-find input').press('Enter');
   await page.waitForFunction(() => /2\s*\/\s*2/.test(document.querySelector('.find-count')?.textContent || ''));
   await page.locator('.desktop-find input').press('Shift+Enter');

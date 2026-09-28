@@ -113,7 +113,6 @@ async function createWindow() {
   win.webContents.on('will-attach-webview', event => event.preventDefault());
   win.webContents.session.setPermissionRequestHandler((_contents, _permission, callback) => callback(false));
   win.webContents.session.setPermissionCheckHandler(() => false);
-  win.webContents.on('found-in-page', (_event, result) => send('modu:find-result', { active: result.activeMatchOrdinal, total: result.matches }));
   win.webContents.on('did-start-loading', () => { rendererReady = false; });
   win.webContents.on('render-process-gone', (_event, details) => { if (details.reason !== 'clean-exit') void dialog.showMessageBox({ type: 'error', message: '阅读窗口意外退出 / Reader stopped', detail: '请关闭并重新打开墨读。你的原始文件没有被更改。\nRestart MoDu Reader. Your original files have not been changed.' }); });
   win.on('close', () => { state.window = { ...win.getNormalBounds(), maximized: win.isMaximized() }; saveState(); });
@@ -144,8 +143,6 @@ else {
     handle('modu:drop', paths => { if (!Array.isArray(paths) || paths.length > 50 || paths.some(p => typeof p !== 'string' || p.length > 32768)) throw new Error('Invalid files'); return queueOpen(paths); });
     handle('modu:reload', id => { const filename = documents.get(id); if (!filename) throw new Error('Unknown document'); return queueOpen([filename]); });
     handle('modu:locale', locale => { if (!['zh', 'en'].includes(locale)) return; state.locale = locale; buildMenu(); saveState(); });
-    handle('modu:find', options => { if (!options || typeof options.text !== 'string' || options.text.length > 1000) throw new Error('Invalid search'); if (!options.text) { win.webContents.stopFindInPage('clearSelection'); return; } return win.webContents.findInPage(options.text, { forward: options.forward !== false, findNext: options.next !== true }); });
-    handle('modu:stop-find', () => win.webContents.stopFindInPage('clearSelection'));
     buildMenu();
     await createWindow();
     await queueOpen(fileArguments(process.argv.slice(app.isPackaged ? 1 : 2), process.cwd()));

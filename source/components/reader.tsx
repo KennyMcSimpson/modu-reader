@@ -220,7 +220,7 @@ function ReaderApp() {
   const nativeActions = useRef<(action: NativeAction) => void>(() => {});
   nativeActions.current = action => {
     if (action === "paste") setPasteOpen(true);
-    if (action === "find") setFindOpen(true);
+    if (action === "find") { setFindOpen(true); requestAnimationFrame(() => { const input = document.querySelector<HTMLInputElement>(".desktop-find input"); input?.focus(); input?.select(); }); }
     if (action === "focus") toggleFocus();
     if (action === "close") closeDoc(activeId);
     if (action === "reload") {
@@ -331,7 +331,7 @@ function ReaderApp() {
             <Popover open={tocOpen} onOpenChange={setTocOpen}><PopoverTrigger asChild><button className="icon-button mobile-toc" aria-label={copy.actions.toc}><List size={18} /></button></PopoverTrigger><PopoverContent align="end" className="mobile-toc-popover"><h2>{copy.toc.title}</h2>{toc}</PopoverContent></Popover>
           </div>
         </header>
-        {desktop && findOpen && <DesktopFind locale={locale} documentId={doc.id} onClose={() => setFindOpen(false)} />}
+        {desktop && findOpen && <DesktopFind locale={locale} documentId={doc.id} content={doc.content} mode={mode} onClose={() => setFindOpen(false)} />}
         <div className="content-layout">
           <div className="document-scroll" ref={scrollArea}>
             <div className={`document-inner width-${preferences.width}`} style={{"--reading-size": `${preferences.size / 16}rem`, "--reading-line": preferences.line} as CSSProperties}>

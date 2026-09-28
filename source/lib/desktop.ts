@@ -7,12 +7,9 @@ export interface DesktopBridge {
   ready(): Promise<{ version: string }>;
   reloadFile(id: string): Promise<void>;
   setLocale(locale: "zh" | "en"): Promise<void>;
-  find(text: string, forward?: boolean, next?: boolean): Promise<number | void>;
-  stopFind(): Promise<void>;
   onDocuments(callback: (documents: NativeDocument[]) => void): Unsubscribe;
   onAction(callback: (action: NativeAction) => void): Unsubscribe;
   onError(callback: (message: string) => void): Unsubscribe;
-  onFindResult(callback: (result: { active: number; total: number }) => void): Unsubscribe;
 }
 declare global { interface Window { moduDesktop?: DesktopBridge } }
 export const desktop = window.moduDesktop;

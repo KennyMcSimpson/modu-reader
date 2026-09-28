@@ -12,12 +12,9 @@ contextBridge.exposeInMainWorld('moduDesktop', Object.freeze({
   ready: () => ipcRenderer.invoke('modu:ready'),
   reloadFile: id => ipcRenderer.invoke('modu:reload', id),
   setLocale: locale => ipcRenderer.invoke('modu:locale', locale),
-  find: (text, forward, next) => ipcRenderer.invoke('modu:find', { text, forward, next }),
-  stopFind: () => ipcRenderer.invoke('modu:stop-find'),
   onDocuments: callback => subscribe('modu:documents', callback),
   onAction: callback => subscribe('modu:action', callback),
   onError: callback => subscribe('modu:error', callback),
-  onFindResult: callback => subscribe('modu:find-result', callback),
 }));
 
 // Only a real OS file drop may provide paths; no arbitrary filesystem IPC is
