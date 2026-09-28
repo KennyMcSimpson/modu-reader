@@ -144,7 +144,7 @@ else {
     handle('modu:drop', paths => { if (!Array.isArray(paths) || paths.length > 50 || paths.some(p => typeof p !== 'string' || p.length > 32768)) throw new Error('Invalid files'); return queueOpen(paths); });
     handle('modu:reload', id => { const filename = documents.get(id); if (!filename) throw new Error('Unknown document'); return queueOpen([filename]); });
     handle('modu:locale', locale => { if (!['zh', 'en'].includes(locale)) return; state.locale = locale; buildMenu(); saveState(); });
-    handle('modu:find', options => { if (!options || typeof options.text !== 'string' || options.text.length > 1000) throw new Error('Invalid search'); if (!options.text) { win.webContents.stopFindInPage('clearSelection'); return; } return win.webContents.findInPage(options.text, { forward: options.forward !== false, findNext: options.next === true }); });
+    handle('modu:find', options => { if (!options || typeof options.text !== 'string' || options.text.length > 1000) throw new Error('Invalid search'); if (!options.text) { win.webContents.stopFindInPage('clearSelection'); return; } return win.webContents.findInPage(options.text, { forward: options.forward !== false, findNext: options.next !== true }); });
     handle('modu:stop-find', () => win.webContents.stopFindInPage('clearSelection'));
     buildMenu();
     await createWindow();

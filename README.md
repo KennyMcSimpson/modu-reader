@@ -27,7 +27,7 @@ Keep the portable EXE together with all neighboring files. Extract it before run
 1. 打开程序后，点击 **打开文件**、按 **Ctrl+O**，或拖入 Markdown 文件。
 2. 安装版可在文件右键菜单的 **打开方式** 中选择 **MoDu Reader**；设为默认后，双击 `.md` 就能打开。
 3. **Ctrl+F** 查找、**F5** 重新读取外部修改、**Ctrl+Shift+F** 切换专注模式。
-4. **文件 → 最近打开** 可重新打开文档；右下角 **中 / EN** 切换界面语言。
+4. **文件 → 最近打开** 可重新打开文档；左下角 **中 / EN** 切换界面语言。
 
 1. Choose **Open file**, press **Ctrl+O**, or drag Markdown files into the window.
 2. With the installed version, choose **MoDu Reader** in Windows **Open with**. Set it as the default if you want to open `.md` files by double-clicking.

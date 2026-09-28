@@ -53,7 +53,7 @@ function MermaidDiagram({ source, dark, labels }: { source: string; dark: boolea
       try {
         const [{ default: mermaid }, { default: purify }] = await Promise.all([import("mermaid"), import("dompurify")]);
         if (cancelled) return;
-        mermaid.initialize({ startOnLoad: false, securityLevel: "strict", theme: dark ? "dark" : "neutral", suppressErrorRendering: true, maxTextSize: 50000, maxEdges: 300, flowchart: { htmlLabels: false }, themeVariables: { fontFamily: 'system-ui, "Microsoft YaHei", sans-serif', primaryColor: dark ? "#29343c" : "#eef2f4", primaryBorderColor: "#a0adb5", lineColor: "#788890" } });
+        mermaid.initialize({ startOnLoad: false, securityLevel: "strict", theme: dark ? "dark" : "neutral", suppressErrorRendering: true, maxTextSize: 50000, maxEdges: 300, htmlLabels: false, flowchart: { htmlLabels: false }, themeVariables: { fontFamily: 'system-ui, "Microsoft YaHei", sans-serif', primaryColor: dark ? "#29343c" : "#eef2f4", primaryBorderColor: "#a0adb5", lineColor: "#788890" } });
         const result = await mermaid.render(`diagram${id}`, source);
         const safe = purify.sanitize(result.svg, { USE_PROFILES: { svg: true, svgFilters: true } });
         if (!cancelled) setSvg(safe);

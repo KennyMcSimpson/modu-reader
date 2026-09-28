@@ -11,7 +11,7 @@ await mkdir(results, { recursive: true });
 await mkdir(path.join(fixture, 'images'));
 await writeFile(path.join(fixture, 'images', '本地 图片.png'), Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAwAAAAMCAIAAADZF8uwAAAAF0lEQVR4nGN82ejPQAgwEVQxqmgAFAEAEL0B0TGFd2QAAAAASUVORK5CYII=', 'base64'));
 const filename = path.join(fixture, '中文 file.md');
-await writeFile(filename, '# Desktop smoke test\n\n离线阅读验证。SearchNeedle is here.\n\n![local image](images/本地%20图片.png)\n\n## Features\n\n| A | B |\n|---|---|\n| one | two |\n\nInline $E=mc^2$.\n\n```js\nconst local = true;\n```\n\n```mermaid\ngraph TD\n  A[Local file] --> B[Desktop reader]\n```\n\n<script>window.injected=true</script>\n');
+await writeFile(filename, '# Desktop smoke test\n\n离线阅读验证。SearchNeedle is here. SearchNeedle is here again.\n\n![local image](images/本地%20图片.png)\n\n## Features\n\n| A | B |\n|---|---|\n| one | two |\n\nInline $E=mc^2$.\n\n```js\nconst local = true;\n```\n\n```mermaid\ngraph TD\n  A[Local file] --> B[Desktop reader]\n```\n\n<script>window.injected=true</script>\n');
 const executable = process.env.MODU_EXECUTABLE;
 const launchArgs = executable ? [filename] : ['.', filename];
 let app;
@@ -35,14 +35,22 @@ try {
   assert.equal(await page.locator('article .katex').count(), 1);
   await page.locator('.mermaid-diagram, .diagram-block').first().scrollIntoViewIfNeeded().catch(() => {});
   await page.locator('article .mermaid-rendered svg, article .mermaid-diagram svg, article .diagram-block svg').first().waitFor({ timeout: 30000 });
+  assert.match((await page.locator(".diagram-svg").textContent()) || "", /Local file/);
+  assert.match((await page.locator(".diagram-svg").textContent()) || "", /Desktop reader/);
   // Exercise native menu commands through the same handler as Ctrl+F / F5.
   await app.evaluate(({ Menu }) => Menu.getApplicationMenu().getMenuItemById('find').click());
   await page.locator('.desktop-find input').fill('SearchNeedle');
-  await page.waitForFunction(() => /1\s*\/\s*1/.test(document.querySelector('.find-count')?.textContent || ''));
+  await page.waitForFunction(() => /1\s*\/\s*2/.test(document.querySelector('.find-count')?.textContent || ''));
+  await page.locator('.desktop-find input').press('Enter');
+  await page.waitForFunction(() => /2\s*\/\s*2/.test(document.querySelector('.find-count')?.textContent || ''));
+  await page.locator('.desktop-find input').press('Shift+Enter');
+  await page.waitForFunction(() => /1\s*\/\s*2/.test(document.querySelector('.find-count')?.textContent || ''));
   await page.locator('.desktop-find input').press('Escape');
   await writeFile(filename, '# Updated on disk\n\nReloaded with F5.');
   await app.evaluate(({ Menu }) => Menu.getApplicationMenu().getMenuItemById('reload-document').click());
   await page.getByRole('heading', { name: 'Updated on disk', exact: true }).waitFor();
+  await page.locator('.locale-option').filter({ hasText: /^中$/ }).click();
+  assert.equal(await page.getByRole('button', { name: /打开文件/ }).count() > 0, true);
   await page.locator('.locale-option').filter({ hasText: /^EN$/ }).click();
   assert.equal(await page.getByRole('button', { name: /Open file/ }).count() > 0, true);
   await page.getByRole('button', { name: /Paste text/ }).click();
@@ -73,6 +81,7 @@ try {
   console.log('Desktop smoke checks passed.');
 } catch (error) {
   if (app) { try { const page = await app.firstWindow(); await page.screenshot({ path: path.join(results, 'failure.png') }); await writeFile(path.join(results, 'failure.html'), await page.content()); } catch {} }
+  console.error(JSON.stringify({ rendererErrors: errors, remoteRequests: network }));
   throw error;
 } finally {
   if (app) await app.close();

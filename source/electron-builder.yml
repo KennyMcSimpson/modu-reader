@@ -9,6 +9,7 @@ files:
   - desktop/**/*
   - dist/desktop/**/*
   - package.json
+  - "!node_modules/**/*"
 asar: true
 npmRebuild: false
 extraFiles:
@@ -42,5 +43,6 @@ nsis:
   installerLanguages: [zh_CN, en_US]
   language: 2052
   displayLanguageSelector: true
+  runAfterFinish: false
   deleteAppDataOnUninstall: false
 publish: null
