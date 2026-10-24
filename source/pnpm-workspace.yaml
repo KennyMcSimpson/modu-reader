@@ -2,7 +2,7 @@
 minimumReleaseAge: 10080
 minimumReleaseAgeIgnoreMissingTime: false
 # Exact security patches for Electron certificate mitigation (2026-10-20)
-# and fast-uri prototype pollution/DoS fixes (2026-10-19).
+# and fast-uri URI scheme/host parsing fixes (2026-10-19).
 minimumReleaseAgeExclude:
   - electron@44.9.1
   - fast-uri@3.1.9
