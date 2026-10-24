@@ -1,6 +1,11 @@
 # Copied Sites are standalone projects and cannot inherit the monorepo policy.
 minimumReleaseAge: 10080
 minimumReleaseAgeIgnoreMissingTime: false
+# Exact security patches for Electron certificate mitigation (2026-10-20)
+# and fast-uri prototype pollution/DoS fixes (2026-10-19).
+minimumReleaseAgeExclude:
+  - electron@44.9.1
+  - fast-uri@3.1.9
 trustLockfile: false
 strictDepBuilds: true
 allowBuilds:
@@ -20,6 +25,10 @@ packageImportMethod: clone-or-copy
 verifyDepsBeforeRun: false
 optimisticRepeatInstall: false
 overrides:
+  # Patch vulnerable electron-builder transitive dependencies within each major.
+  "http-cache-semantics@>=4.0.0 <4.3.0": 4.3.0
+  "fast-uri@>=3.0.0 <3.1.9": 3.1.9
+  "undici@>=6.0.0 <6.29.1": 6.29.1
   # All Markdown and Mermaid math renderers must use the patched KaTeX build.
   katex: 0.18.2
   miniflare>sharp: 0.35.4
