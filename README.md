@@ -13,8 +13,8 @@ A calm **Windows desktop Markdown reader**. A standalone application for local d
 
 | 文件 / File | 用法 / How to use |
 | --- | --- |
-| [免安装 ZIP / Portable ZIP](https://github.com/KennyMcSimpson/modu-reader/releases/latest/download/MoDu-Reader-2.0.0-Windows-x64.zip) | 完整解压，双击 `MoDu Reader.exe`。可直接把整个 ZIP 发给朋友。 / Extract everything, then launch `MoDu Reader.exe`. Share the entire ZIP. |
-| [安装包 / Installer](https://github.com/KennyMcSimpson/modu-reader/releases/latest/download/MoDu-Reader-2.0.0-Setup-x64.exe) | 安装后从桌面或开始菜单打开。 / Install and launch from the desktop or Start menu. |
+| [免安装 ZIP / Portable ZIP](https://github.com/KennyMcSimpson/modu-reader/releases/latest/download/MoDu-Reader-2.0.1-Windows-x64.zip) | 完整解压，双击 `MoDu Reader.exe`。可直接把整个 ZIP 发给朋友。 / Extract everything, then launch `MoDu Reader.exe`. Share the entire ZIP. |
+| [安装包 / Installer](https://github.com/KennyMcSimpson/modu-reader/releases/latest/download/MoDu-Reader-2.0.1-Setup-x64.exe) | 安装后从桌面或开始菜单打开。 / Install and launch from the desktop or Start menu. |
 
 免安装版的 EXE 需要旁边的运行文件，请勿单独移动 EXE，也不要在压缩包预览中直接运行。**GitHub 的 Code → Download ZIP 是源码，不是可运行的 Windows 安装包。**
 
@@ -77,7 +77,7 @@ Build outputs go to `release/`. GitHub Actions builds on Windows, tests both the
 
 - [`source/README.md`](source/README.md)：源码结构与验证 / source layout and verification
 - [`使用说明.txt`](使用说明.txt)：双语使用说明 / bilingual quick start
-- [`docs/releases/v2.0.0.md`](docs/releases/v2.0.0.md)：2.0 桌面版发布说明 / desktop release notes
+- [`docs/releases/v2.0.1.md`](docs/releases/v2.0.1.md)：2.0.1 安全补丁发布说明 / security patch release notes
 - [`CONTRIBUTING.md`](CONTRIBUTING.md)：贡献指南 / contribution guide
 - [`LICENSE`](LICENSE)：MIT 许可证 / MIT license
 

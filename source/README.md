@@ -53,9 +53,9 @@ File tests cover Chinese paths, encodings, limits, path traversal, and external 
 
 The renderer is sandboxed with context isolation and no Node.js integration. Only the app’s local main frame can use the defined IPC handlers. Document HTML is not executed. Windows default handlers are left to the user.
 
-GitHub Actions 的 Windows 工作流在全部检查通过后发布 `package.json` 中的版本。发布新版本时同步更新版本号、下载链接与发布说明文件。修改已发布版本的源码不会覆盖其下载文件。
+GitHub Actions 的 Windows 工作流在全部检查通过后发布 `package.json` 中的版本。发布新版本时同步更新版本号和下载链接，并添加 `docs/releases/v<版本号>.md` 发布说明。工作流根据版本号选择发布说明；已存在的标签或发布记录不会被覆盖。修改已发布版本的源码不会覆盖其下载文件。
 
-The Windows Actions workflow publishes the package version after checks pass. For a new release, update the version, download links, and release notes path together. A published version’s binaries are never overwritten.
+The Windows Actions workflow publishes the package version after checks pass. For a new release, update the version and download links, and add `docs/releases/v<version>.md`. The workflow selects notes by version and refuses to reuse an existing tag without a release. Existing published binaries are never overwritten.
 
 历史单文件构建仍可通过 `pnpm run build:html` 生成，但不属于 2.0 的 Windows 分发包。
 
