@@ -20,4 +20,6 @@ packageImportMethod: clone-or-copy
 verifyDepsBeforeRun: false
 optimisticRepeatInstall: false
 overrides:
+  # All Markdown and Mermaid math renderers must use the patched KaTeX build.
+  katex: 0.18.2
   miniflare>sharp: 0.35.4

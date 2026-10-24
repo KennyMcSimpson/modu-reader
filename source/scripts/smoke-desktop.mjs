@@ -11,7 +11,7 @@ await mkdir(results, { recursive: true });
 await mkdir(path.join(fixture, 'images'));
 await writeFile(path.join(fixture, 'images', '本地 图片.png'), Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAwAAAAMCAIAAADZF8uwAAAAF0lEQVR4nGN82ejPQAgwEVQxqmgAFAEAEL0B0TGFd2QAAAAASUVORK5CYII=', 'base64'));
 const filename = path.join(fixture, '中文 file.md');
-await writeFile(filename, '# Desktop smoke test\n\n离线阅读验证。SearchNeedle is here. SearchNeedle is here again.\n\n![local image](images/本地%20图片.png)\n\n## Features\n\n| A | B |\n|---|---|\n| one | two |\n\nInline $E=mc^2$.\n\n```js\nconst local = true;\n```\n\n```mermaid\ngraph TD\n  A[Local file] --> B[Desktop reader]\n```\n\n<script>window.injected=true</script>\n');
+await writeFile(filename, '# Desktop smoke test\n\n离线阅读验证。SearchNeedle is here. SearchNeedle is here again.\n\n![local image](images/本地%20图片.png)\n\n## Features\n\n| A | B |\n|---|---|\n| one | two |\n\nInline $E=mc^2$.\n\n$$\n\\frac{1}{2} + \\sqrt{x}\n$$\n\n```js\nconst local = true;\n```\n\n```mermaid\ngraph TD\n  A[Local file] --> B[Desktop reader]\n```\n\n<script>window.__moduUntrustedMarkdownExecuted=true</script>\n');
 const executable = process.env.MODU_EXECUTABLE;
 const launchArgs = executable ? [filename] : ['.', filename];
 let app;
@@ -24,7 +24,7 @@ try {
   page.on('request', request => { if (/^https?:/.test(request.url())) network.push(request.url()); });
   await page.getByRole('heading', { name: 'Desktop smoke test', exact: true }).waitFor();
   assert.equal(await page.evaluate(() => typeof window.require), 'undefined');
-  assert.equal(await page.evaluate(() => window.injected), undefined);
+  assert.equal(await page.evaluate(() => window.__moduUntrustedMarkdownExecuted), undefined);
   const prefs = await app.evaluate(({ BrowserWindow }) => {
     const p = BrowserWindow.getAllWindows()[0].webContents.getLastWebPreferences();
     return { sandbox: p.sandbox, contextIsolation: p.contextIsolation, nodeIntegration: p.nodeIntegration };
@@ -32,7 +32,12 @@ try {
   assert.deepEqual(prefs, { sandbox: true, contextIsolation: true, nodeIntegration: false });
   await page.waitForFunction(() => { const image = document.querySelector('article img'); return image?.complete && image.naturalWidth > 0; });
   assert.equal(await page.locator('article table').count(), 1);
-  assert.equal(await page.locator('article .katex').count(), 1);
+  assert.equal(await page.locator('article .katex').count(), 2);
+  assert.equal(await page.locator('article .katex-display').count(), 1);
+  assert.equal(await page.locator('article .katex-error').count(), 0);
+  assert.equal(await page.locator('article .katex-mathml').count(), 2);
+  await page.evaluate(() => document.fonts.ready);
+  assert.equal(await page.locator('article .katex-html').first().evaluate(el => getComputedStyle(el).fontFamily.includes('KaTeX')), true);
   await page.locator('.mermaid-diagram, .diagram-block').first().scrollIntoViewIfNeeded().catch(() => {});
   await page.locator('article .mermaid-rendered svg, article .mermaid-diagram svg, article .diagram-block svg').first().waitFor({ timeout: 30000 });
   assert.match((await page.locator(".diagram-svg").textContent()) || "", /Local file/);
@@ -63,8 +68,10 @@ try {
   const secondFile = path.join(fixture, 'second.md');
   await writeFile(secondFile, '# Second instance\n\nOpened from the operating system.');
   const childArgs = executable ? [secondFile] : ['.', secondFile];
+  // Playwright may launch Electron through cmd.exe on Windows.
+  const childExecutable = executable || await app.evaluate(() => process.execPath);
   await new Promise((resolve, reject) => {
-    const child = spawn(executable || app.process().spawnfile, childArgs, { env: { ...process.env, NODE_ENV: 'test', MODU_TEST_USER_DATA: path.join(fixture, 'profile') }, stdio: 'ignore' });
+    const child = spawn(childExecutable, childArgs, { env: { ...process.env, NODE_ENV: 'test', MODU_TEST_USER_DATA: path.join(fixture, 'profile') }, stdio: 'ignore' });
     const timer = setTimeout(() => { child.kill(); reject(new Error('Second instance did not exit')); }, 20000);
     child.on('error', reject); child.on('exit', code => { clearTimeout(timer); code === 0 ? resolve() : reject(new Error(`Second instance exit ${code}`)); });
   });
