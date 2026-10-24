@@ -36,7 +36,7 @@
   "dependencies": {
     "class-variance-authority": "0.7.1",
     "clsx": "2.1.1",
-    "dompurify": "3.4.15",
+    "dompurify": "3.4.17",
     "katex": "0.16.47",
     "lucide-react": "1.31.0",
     "mermaid": "11.17.2",
