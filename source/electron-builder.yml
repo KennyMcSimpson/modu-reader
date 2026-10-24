@@ -1,6 +1,6 @@
 appId: io.github.kennymcsimpson.modu
 productName: MoDu Reader
-electronVersion: 44.4.3
+electronVersion: 44.9.1
 directories:
   app: dist/app
   output: ../release

@@ -12,6 +12,7 @@ await mkdir(path.join(fixture, 'images'));
 await writeFile(path.join(fixture, 'images', '本地 图片.png'), Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAwAAAAMCAIAAADZF8uwAAAAF0lEQVR4nGN82ejPQAgwEVQxqmgAFAEAEL0B0TGFd2QAAAAASUVORK5CYII=', 'base64'));
 const filename = path.join(fixture, '中文 file.md');
 await writeFile(filename, '# Desktop smoke test\n\n离线阅读验证。SearchNeedle is here. SearchNeedle is here again.\n\n![local image](images/本地%20图片.png)\n\n## Features\n\n| A | B |\n|---|---|\n| one | two |\n\nInline $E=mc^2$.\n\n$$\n\\frac{1}{2} + \\sqrt{x}\n$$\n\n```js\nconst local = true;\n```\n\n```mermaid\ngraph TD\n  A[Local file] --> B[Desktop reader]\n```\n\n<script>window.__moduUntrustedMarkdownExecuted=true</script>\n');
+const expectedElectronVersion = JSON.parse(await readFile(new URL('../package.json', import.meta.url), 'utf8')).devDependencies.electron;
 const executable = process.env.MODU_EXECUTABLE;
 const launchArgs = executable ? [filename] : ['.', filename];
 let app;
@@ -20,6 +21,7 @@ const network = [];
 try {
   app = await electron.launch({ ...(executable ? { executablePath: path.resolve(executable) } : {}), args: launchArgs, timeout: 90000, env: { ...process.env, NODE_ENV: 'test', MODU_TEST_USER_DATA: path.join(fixture, 'profile') } });
   const page = await app.firstWindow();
+  assert.equal(await app.evaluate(() => process.versions.electron), expectedElectronVersion, 'The running desktop runtime must match the pinned Electron dependency');
   page.on('pageerror', error => errors.push(error.message));
   page.on('request', request => { if (/^https?:/.test(request.url())) network.push(request.url()); });
   await page.getByRole('heading', { name: 'Desktop smoke test', exact: true }).waitFor();
