@@ -1,65 +1,71 @@
-# 墨读 MoDu Reader
+# MoDu Reader
 
 [![Windows desktop](https://github.com/KennyMcSimpson/modu-reader/actions/workflows/windows-release.yml/badge.svg)](https://github.com/KennyMcSimpson/modu-reader/actions/workflows/windows-release.yml)
 [![Latest release](https://img.shields.io/github/v/release/KennyMcSimpson/modu-reader)](https://github.com/KennyMcSimpson/modu-reader/releases/latest)
 
-一款专注阅读的 **Windows 桌面 Markdown 应用**。独立窗口、本地文件、打开即读；无需注册、浏览器或开发环境。
+**The offline Windows Markdown reader built for living AI, research, and repository docs.**
 
-A calm **Windows desktop Markdown reader**. A standalone application for local documents, with no account, browser, or development environment required.
+Open any local `.md` file or folder — without creating `.obsidian/` folders, vault indexes, or touching a single byte of your files. When an AI coding agent, build script, or external editor rewrites the file on disk, MoDu automatically live-reloads it, highlights which sections changed, and keeps your exact scroll position.
 
-## 下载 · Download
+## Why MoDu Instead of Typora / Obsidian / VS Code Preview?
 
-**[下载最新版 / Latest release](https://github.com/KennyMcSimpson/modu-reader/releases/latest)** · Windows 10 / 11，64 位 x64
+| Need | Mainstream Tools | MoDu Reader 2.1 |
+| --- | --- | --- |
+| Read docs inside a Git repo | Obsidian creates `.obsidian/` vaults; editors risk accidental keystrokes | **Strict Read-Only** — zero repo pollution, zero accidental edits |
+| Follow AI agent plans (`PLAN.md`, reports) | Manual `F5` reload or scrolling jumps back to top | **Live Diff-Watch** — auto-reloads on disk edits, highlights changed sections, and jumps straight to the next change |
+| Inspect huge Mermaid diagrams & tables | Tiny cramped SVG / manual cell selection | **Click-to-zoom pan lightbox + Copy SVG**, **1-click CSV / TSV table copy**, **1-click Copy Raw LaTeX** |
+| Read GitHub / docs folders | Missing `[!NOTE]` alerts or YAML frontmatter shows as raw text | **Native YAML Frontmatter cards**, **5 GitHub Alerts**, **Read-only Folder drawer**, and **relative `.md` link navigation** |
+| Privacy & offline reliability | Accounts, telemetry, or remote CDN fonts | **100% offline bundled** (KaTeX, Mermaid, Highlight.js), sandboxed Electron renderer, zero telemetry |
 
-| 文件 / File | 用法 / How to use |
+## Download (Windows 10 / 11 x64)
+
+**[Download latest release](https://github.com/KennyMcSimpson/modu-reader/releases/latest)**
+
+| Package | How to use |
 | --- | --- |
-| [免安装 ZIP / Portable ZIP](https://github.com/KennyMcSimpson/modu-reader/releases/latest/download/MoDu-Reader-2.0.0-Windows-x64.zip) | 完整解压，双击 `MoDu Reader.exe`。可直接把整个 ZIP 发给朋友。 / Extract everything, then launch `MoDu Reader.exe`. Share the entire ZIP. |
-| [安装包 / Installer](https://github.com/KennyMcSimpson/modu-reader/releases/latest/download/MoDu-Reader-2.0.0-Setup-x64.exe) | 安装后从桌面或开始菜单打开。 / Install and launch from the desktop or Start menu. |
+| [Portable ZIP](https://github.com/KennyMcSimpson/modu-reader/releases/latest/download/MoDu-Reader-2.1.0-Windows-x64.zip) | Extract the full archive and run `MoDu Reader.exe`. Keep neighboring files beside the EXE. |
+| [Windows Installer](https://github.com/KennyMcSimpson/modu-reader/releases/latest/download/MoDu-Reader-2.1.0-Setup-x64.exe) | Per-user installer with Start Menu / Desktop shortcut and Windows **Open with** registration. |
 
-免安装版的 EXE 需要旁边的运行文件，请勿单独移动 EXE，也不要在压缩包预览中直接运行。**GitHub 的 Code → Download ZIP 是源码，不是可运行的 Windows 安装包。**
+> [!NOTE]
+> GitHub's **Code → Download ZIP** contains source code, not the compiled Windows application. Release binaries are currently unsigned; Windows SmartScreen may show an unknown-publisher prompt. Verify every download against `SHA256SUMS.txt`.
 
-Keep the portable EXE together with all neighboring files. Extract it before running. **GitHub’s Code → Download ZIP contains source code, not the Windows application.**
+## Features in 2.1.0
 
-当前安装包未进行商业代码签名，Windows 可能显示“未知发布者”。发布页提供 SHA-256 校验文件。 / The builds are unsigned; Windows may show an unknown publisher. SHA-256 checksums are included in each release.
+- **Live Diff-Watch (`Radio` toggle)**: Watches opened local files for external changes (including atomic-rename editor saves), reloads without losing your scroll position, marks changed headings in the body and Table of Contents, and provides a **Next change** jump button.
+- **Read-Only Folder Drawer (`Ctrl+Shift+O`) & Relative `.md` Link Navigation**: Browse an entire repository's Markdown files without modifying anything, follow relative `[other](./guide.md#section)` links within the authorized folder boundary, and step through history with `Alt+Left` / `Alt+Right`.
+- **Interactive Technical Reading Tools**:
+  - **Mermaid & Image Lightbox**: Click any diagram or image to zoom (`+`/`-`/wheel) and pan, or copy sanitized SVG straight to the clipboard.
+  - **1-Click Copy Raw LaTeX (`TeX`)**: Hover any display equation to copy its original LaTeX expression.
+  - **1-Click Table Copy (`CSV` / `TSV`)**: Hover any GFM table to copy RFC-4180 CSV or spreadsheet-ready TSV.
+  - **Quote with Citation (`Quote` button)**: Copies your selected passage (or active heading) as a formatted Markdown blockquote with filename and section reference.
+- **Native YAML Frontmatter & GitHub Alerts**: Renders leading `---` metadata blocks as collapsible cards and styles `[!NOTE]`, `[!TIP]`, `[!IMPORTANT]`, `[!WARNING]`, and `[!CAUTION]` callouts natively.
+- **Read / Split / Source Modes**: Inspect rendered output side-by-side with raw Markdown source in Split view.
+- **Export Clean PDF (`Ctrl+P`) & Always-on-Top Pin (`Ctrl+Shift+T`)**: Print-styled PDF export and floating reference window mode.
+- **Persistent Reading Position**: Automatically remembers scroll positions per document path across restarts.
+- **Local Security Boundaries**: Sandboxed renderer (`contextIsolation: true`, `sandbox: true`, `nodeIntegration: false`), strict document/folder symlink-escape checks, 2 MB document cap, 20 MB local image cap, UTF-8 / UTF-16 BOM / GB18030 decoding, and zero remote requests for local content.
 
-## 开始阅读 · Start reading
+## Keyboard Shortcuts
 
-1. 打开程序后，点击 **打开文件**、按 **Ctrl+O**，或拖入 Markdown 文件。
-2. 安装版可在文件右键菜单的 **打开方式** 中选择 **MoDu Reader**；设为默认后，双击 `.md` 就能打开。
-3. **Ctrl+F** 查找、**F5** 重新读取外部修改、**Ctrl+Shift+F** 切换专注模式。
-4. **文件 → 最近打开** 可重新打开文档；左下角 **中 / EN** 切换界面语言。
+| Shortcut | Action |
+| --- | --- |
+| `Ctrl+O` | Open Markdown files |
+| `Ctrl+Shift+O` | Open folder (read-only) |
+| `Ctrl+Shift+V` | Paste Markdown text |
+| `Ctrl+F` | Find in document |
+| `F5` | Manually reload current file |
+| `Ctrl+P` | Export PDF |
+| `Ctrl+Shift+T` | Toggle Always on Top |
+| `Ctrl+Shift+F` | Toggle Focus Mode (`Esc` exits) |
+| `Alt+Left` / `Alt+Right` | Navigate Back / Forward across linked documents |
+| `Ctrl+W` | Close active document |
 
-1. Choose **Open file**, press **Ctrl+O**, or drag Markdown files into the window.
-2. With the installed version, choose **MoDu Reader** in Windows **Open with**. Set it as the default if you want to open `.md` files by double-clicking.
-3. **Ctrl+F** finds text; **F5** reloads changes made in another editor; **Ctrl+Shift+F** toggles focus mode.
-4. Use **File → Open recent** to reopen documents, and **中 / EN** to change the UI language.
+## Privacy
 
-## 功能 · Features
+Documents and pasted text are processed exclusively in local memory. There are no accounts, cloud sync, analytics, or update pings. Only preferences, window bounds, recent paths (clearable from **File → Open Recent**), and per-file scroll offsets are saved locally. MoDu never modifies your Markdown files.
 
-- 系统文件对话框、多文档切换、拖放、粘贴阅读、命令行打开 / Native file dialog, multiple documents, drag-and-drop, pasted text, command-line opening
-- 最近打开记录、窗口位置记忆、系统文件“打开方式” / Recent files, remembered window bounds, Windows file integration
-- 目录导航、查找、阅读进度、源码视图与专注模式 / Contents navigation, find, reading progress, source view, focus mode
-- 中英界面、字体与排版调整、浅色/深色/系统主题 / Chinese and English UI, typography settings, light/dark/system themes
-- GFM 表格、任务列表、代码高亮与复制 / GFM tables, task lists, syntax highlighting and copying
-- LaTeX 数学公式和 Mermaid 图表，所需组件随应用附带 / Bundled LaTeX math and Mermaid diagrams
-- 自动显示文档同目录或子目录中的相对路径图片 / Relative images inside the document’s own directory or its subdirectories
-- `.md`、`.markdown`、`.mdown`、`.txt`；UTF-8、带 BOM 的 UTF-16、GB18030 / Markdown and text files in common encodings
+## Development & Build
 
-单个文档上限 2 MB，本地图片上限 20 MB；不读取文档文件夹以外的图片。网络图片仍需联网，外部网页链接由系统默认浏览器打开。墨读是阅读器，不会修改原文件。
-
-Documents are limited to 2 MB and local images to 20 MB. Images outside the document folder are not read. Remote images need a network connection; external links open in your default browser. MoDu is a reader and does not modify source documents.
-
-## 隐私 · Privacy
-
-文档与粘贴文本在本机内存中处理，不上传、不遥测、无账号。主题、语言、窗口位置及最近文件的路径保存在本机应用数据目录；最近文件记录可以从菜单清空。关闭应用后不会保存文档正文或粘贴内容。免安装版也会使用当前 Windows 用户的应用数据目录保存这些设置。
-
-Documents and pasted text are processed locally in memory. There are no uploads, accounts, or analytics. Preferences, language, window bounds, and recent file paths are stored in local application data; clear recent paths from the File menu. Document text and pasted content are not saved on exit. The portable version also stores settings in the current Windows user’s application data directory.
-
-## 开发与构建 · Development
-
-桌面外壳使用 Electron，阅读界面使用 React/Vite；程序自带运行环境。源码使用 Node.js 24 与 pnpm 11.25.0。正常使用只需下载上面的 Windows 成品。
-
-The desktop shell uses Electron and the reader UI uses React/Vite. The runtime is bundled. Development requires Node.js 24 and pnpm 11.25.0; end users only need the release downloads.
+Requires Node.js 24 and pnpm 11.25.0.
 
 ```sh
 cd source
@@ -67,20 +73,13 @@ pnpm install --frozen-lockfile
 pnpm run typecheck
 pnpm test
 pnpm run dev
-# 在 Windows 上生成 ZIP 与安装包 / Build Windows packages on Windows:
+# Build Windows portable ZIP + NSIS installer into ../release/
 pnpm run dist:win
 ```
 
-构建产物位于根目录的 `release/`。GitHub Actions 在 Windows 上构建，验证解压后的 EXE 和安装后的 EXE，通过后发布当前版本；已经发布的同版本文件不会被覆盖。
+- [`source/README.md`](source/README.md) — Source layout, security model, and verification
+- [`docs/releases/v2.1.0.md`](docs/releases/v2.1.0.md) — v2.1.0 release notes
+- [`CONTRIBUTING.md`](CONTRIBUTING.md) — Contribution guidelines
+- [`LICENSE`](LICENSE) — MIT License
 
-Build outputs go to `release/`. GitHub Actions builds on Windows, tests both the extracted portable EXE and the installed EXE, and publishes the version after successful checks. Published versions are never overwritten.
-
-- [`source/README.md`](source/README.md)：源码结构与验证 / source layout and verification
-- [`使用说明.txt`](使用说明.txt)：双语使用说明 / bilingual quick start
-- [`docs/releases/v2.0.0.md`](docs/releases/v2.0.0.md)：2.0 桌面版发布说明 / desktop release notes
-- [`CONTRIBUTING.md`](CONTRIBUTING.md)：贡献指南 / contribution guide
-- [`LICENSE`](LICENSE)：MIT 许可证 / MIT license
-
-第三方许可证随 Windows 应用一起分发；Electron / Chromium 的许可证与阅读器组件的 `THIRD_PARTY_NOTICES` 均保留。
-
-Third-party licenses are shipped with the Windows app, including Electron / Chromium notices and the renderer’s `THIRD_PARTY_NOTICES` directory.
+Third-party dependency licenses are bundled in `THIRD_PARTY_NOTICES`.

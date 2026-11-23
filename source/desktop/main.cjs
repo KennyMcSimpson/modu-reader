@@ -3,22 +3,27 @@ const fs = require('node:fs/promises');
 const path = require('node:path');
 const { pathToFileURL } = require('node:url');
 const { randomUUID } = require('node:crypto');
-const { readDocument, resolveImage, fileArguments, externalUrl } = require('./files.cjs');
+const {
+  readDocument, resolveImage, resolveLinkedDocument, listFolderDocuments,
+  createFileWatcher, fileArguments, externalUrl, isInside,
+} = require('./files.cjs');
 
 const APP_ID = 'io.github.kennymcsimpson.modu';
 const indexFile = path.join(__dirname, '../dist/desktop/index.html');
 const indexURL = pathToFileURL(indexFile).href;
 const icon = path.join(__dirname, 'assets/icon.png');
 let win;
-let state = { recent: [], window: { width: 1260, height: 850 }, locale: 'zh' };
+let state = { recent: [], window: { width: 1260, height: 850 }, liveWatch: true, alwaysOnTop: false };
 let stateFile;
 let pending = [];
 let pendingErrors = [];
 let rendererReady = false;
 let writeQueue = Promise.resolve();
 let openingQueue = Promise.resolve();
+let activeFolderRoot = null;
 const documents = new Map();
 const byPath = new Map();
+const watchers = new Map();
 
 app.setName('MoDu Reader');
 app.setAppUserModelId(APP_ID);
@@ -37,15 +42,43 @@ function saveState() {
 function send(channel, payload) { if (win && !win.isDestroyed()) win.webContents.send(channel, payload); }
 function report(error) { const message = error instanceof Error ? error.message : String(error); if (rendererReady) send('modu:error', message); else pendingErrors.push(message); }
 function deliver(batch) { if (rendererReady) send('modu:documents', batch); else pending.push(...batch); }
-function queueOpen(paths) {
+
+function setNativeAlwaysOnTop(enabled) {
+  if (!win || win.isDestroyed()) return;
+  // Electron's default Windows "floating" level is not reported as always-on-top
+  // by current desktop builds. The torn-off level maps to the native topmost style.
+  if (process.platform === 'win32' && enabled) win.setAlwaysOnTop(true, 'torn-off');
+  else win.setAlwaysOnTop(enabled === true);
+}
+
+function stopWatcher(id) {
+  const existing = watchers.get(id);
+  if (existing) { existing.close(); watchers.delete(id); }
+}
+function stopAllWatchers() {
+  for (const w of watchers.values()) w.close();
+  watchers.clear();
+}
+function ensureWatcher(id, filePath, initialContent) {
+  stopWatcher(id);
+  if (!state.liveWatch || !documents.has(id)) return;
+  const watcher = createFileWatcher(filePath, initialContent, updated => {
+    send('modu:document-updated', { id, ...updated, watched: true });
+  });
+  watchers.set(id, watcher);
+}
+
+function queueOpen(paths, fragment = '') {
   openingQueue = openingQueue.catch(() => {}).then(async () => {
     const batch = [];
     for (const filename of paths.slice(0, 50)) {
       try {
         const data = await readDocument(filename);
         const id = byPath.get(data.path) || randomUUID();
-        byPath.set(data.path, id); documents.set(id, data.path);
-        batch.push({ id, ...data });
+        byPath.set(data.path, id);
+        documents.set(id, data.path);
+        ensureWatcher(id, data.path, data.content);
+        batch.push({ id, ...data, ...(fragment ? { fragment } : {}) });
         state.recent = [data.path, ...state.recent.filter(p => p !== data.path)].slice(0, 15);
         app.addRecentDocument(data.path);
       } catch (error) { report(error); }
@@ -54,14 +87,41 @@ function queueOpen(paths) {
   });
   return openingQueue;
 }
+
 async function openDialog() {
   const selected = await dialog.showOpenDialog(win, {
-    title: state.locale === 'en' ? 'Open Markdown' : '打开 Markdown 文档',
+    title: 'Open Markdown',
     properties: ['openFile', 'multiSelections'],
     filters: [{ name: 'Markdown & Text', extensions: ['md', 'markdown', 'mdown', 'txt'] }],
   });
   if (!selected.canceled) await queueOpen(selected.filePaths);
 }
+
+async function openFolderDialog() {
+  const selected = await dialog.showOpenDialog(win, {
+    title: 'Open Folder (Read-Only)',
+    properties: ['openDirectory'],
+  });
+  if (selected.canceled || !selected.filePaths[0]) return null;
+  const listing = await listFolderDocuments(selected.filePaths[0]);
+  activeFolderRoot = listing.root;
+  return listing;
+}
+
+async function exportPdfDialog(suggestedName = 'document.pdf') {
+  if (!win || win.isDestroyed()) return { canceled: true };
+  const safeBase = String(suggestedName || 'document').replace(/[<>:"/\\|?*\x00-\x1f]/g, '_').replace(/\.(md|markdown|mdown|txt)$/i, '');
+  const selected = await dialog.showSaveDialog(win, {
+    title: 'Export PDF',
+    defaultPath: (safeBase || 'document') + '.pdf',
+    filters: [{ name: 'PDF Document', extensions: ['pdf'] }],
+  });
+  if (selected.canceled || !selected.filePath) return { canceled: true };
+  const pdfBuffer = await win.webContents.printToPDF({ printBackground: true, preferCSSPageSize: true });
+  await fs.writeFile(selected.filePath, pdfBuffer);
+  return { ok: true, path: selected.filePath };
+}
+
 function trusted(event) {
   if (!win || event.sender !== win.webContents || event.senderFrame !== event.sender.mainFrame || event.senderFrame.url.split('#')[0] !== indexURL) throw new Error('Untrusted sender');
 }
@@ -69,32 +129,45 @@ function handle(channel, callback) { ipcMain.handle(channel, async (event, ...ar
 function focusWindow() { if (!win) return; if (win.isMinimized()) win.restore(); win.show(); win.focus(); }
 
 function buildMenu() {
-  const en = state.locale === 'en';
-  const t = (zh, eng) => en ? eng : zh;
   const action = name => () => send('modu:action', name);
   const recents = state.recent.map(filename => ({ label: path.basename(filename).replaceAll('&', '&&'), sublabel: path.dirname(filename), click: () => queueOpen([filename]) }));
   Menu.setApplicationMenu(Menu.buildFromTemplate([
-    { label: t('文件(&F)', '&File'), submenu: [
-      { id: 'open', label: t('打开文档…', 'Open documents…'), accelerator: 'CmdOrCtrl+O', click: openDialog },
-      { label: t('最近打开', 'Open recent'), submenu: [...recents, { type: 'separator' }, { label: t('清空记录', 'Clear recent files'), enabled: !!recents.length, click: () => { state.recent = []; app.clearRecentDocuments(); saveState(); buildMenu(); } }] },
-      { label: t('粘贴文本…', 'Paste Markdown…'), accelerator: 'CmdOrCtrl+Shift+V', click: action('paste') },
-      { id: 'reload-document', label: t('重新读取当前文件', 'Reload current file'), accelerator: 'F5', click: action('reload') },
-      { label: t('关闭当前文档', 'Close document'), accelerator: 'CmdOrCtrl+W', click: action('close') },
-      { type: 'separator' }, { role: 'quit', label: t('退出', 'Quit') },
+    { label: '&File', submenu: [
+      { id: 'open', label: 'Open Documents…', accelerator: 'CmdOrCtrl+O', click: openDialog },
+      { id: 'open-folder', label: 'Open Folder (Read-Only)…', accelerator: 'CmdOrCtrl+Shift+O', click: action('open-folder') },
+      { label: 'Open Recent', submenu: [...recents, { type: 'separator' }, { label: 'Clear Recent Files', enabled: !!recents.length, click: () => { state.recent = []; app.clearRecentDocuments(); saveState(); buildMenu(); } }] },
+      { label: 'Paste Markdown…', accelerator: 'CmdOrCtrl+Shift+V', click: action('paste') },
+      { id: 'reload-document', label: 'Reload Current File', accelerator: 'F5', click: action('reload') },
+      { id: 'export-pdf', label: 'Export PDF…', accelerator: 'CmdOrCtrl+P', click: action('export-pdf') },
+      { label: 'Close Document', accelerator: 'CmdOrCtrl+W', click: action('close') },
+      { type: 'separator' }, { role: 'quit', label: 'Quit' },
     ] },
-    { label: t('编辑(&E)', '&Edit'), submenu: [
-      { role: 'undo', label: t('撤销', 'Undo') }, { role: 'redo', label: t('重做', 'Redo') }, { type: 'separator' },
-      { role: 'cut', label: t('剪切', 'Cut') }, { role: 'copy', label: t('复制', 'Copy') }, { role: 'paste', label: t('粘贴', 'Paste') }, { role: 'selectAll', label: t('全选', 'Select all') },
-      { type: 'separator' }, { id: 'find', label: t('查找…', 'Find…'), accelerator: 'CmdOrCtrl+F', click: action('find') },
+    { label: '&Edit', submenu: [
+      { role: 'undo', label: 'Undo' }, { role: 'redo', label: 'Redo' }, { type: 'separator' },
+      { role: 'cut', label: 'Cut' }, { role: 'copy', label: 'Copy' }, { role: 'paste', label: 'Paste' }, { role: 'selectAll', label: 'Select All' },
+      { type: 'separator' }, { id: 'find', label: 'Find…', accelerator: 'CmdOrCtrl+F', click: action('find') },
     ] },
-    { label: t('视图(&V)', '&View'), submenu: [
-      { label: t('专注模式', 'Focus mode'), accelerator: 'CmdOrCtrl+Shift+F', click: action('focus') },
-      { role: 'togglefullscreen', label: t('全屏', 'Fullscreen') }, { type: 'separator' },
-      { role: 'resetZoom', label: t('重置界面缩放', 'Reset zoom') }, { role: 'zoomIn', label: t('放大界面', 'Zoom in') }, { role: 'zoomOut', label: t('缩小界面', 'Zoom out') },
+    { label: '&View', submenu: [
+      { id: 'live-watch', label: 'Live Watch External Changes', type: 'checkbox', checked: state.liveWatch, click: item => {
+        state.liveWatch = item.checked;
+        saveState();
+        if (!state.liveWatch) stopAllWatchers();
+        else { for (const [id, filePath] of documents.entries()) { void readDocument(filePath).then(d => ensureWatcher(id, filePath, d.content)).catch(() => {}); } }
+        send('modu:action', state.liveWatch ? 'watch-on' : 'watch-off');
+      } },
+      { id: 'always-on-top', label: 'Always on Top', type: 'checkbox', checked: state.alwaysOnTop, accelerator: 'CmdOrCtrl+Shift+T', click: item => {
+        state.alwaysOnTop = item.checked;
+        setNativeAlwaysOnTop(state.alwaysOnTop);
+        saveState();
+        send('modu:action', state.alwaysOnTop ? 'pin-on' : 'pin-off');
+      } },
+      { label: 'Focus Mode', accelerator: 'CmdOrCtrl+Shift+F', click: action('focus') },
+      { role: 'togglefullscreen', label: 'Fullscreen' }, { type: 'separator' },
+      { role: 'resetZoom', label: 'Reset Zoom' }, { role: 'zoomIn', label: 'Zoom In' }, { role: 'zoomOut', label: 'Zoom Out' },
     ] },
-    { label: t('帮助(&H)', '&Help'), submenu: [
+    { label: '&Help', submenu: [
       { label: 'GitHub', click: () => shell.openExternal('https://github.com/KennyMcSimpson/modu-reader') },
-      { label: t('关于墨读', 'About MoDu Reader'), click: () => dialog.showMessageBox(win, { type: 'info', title: 'MoDu Reader', message: `墨读 MoDu Reader ${app.getVersion()}`, detail: t('Windows 桌面 Markdown 阅读器。文档在本地处理，无需账号。\n开源组件许可证位于应用安装目录的 THIRD_PARTY_NOTICES 文件夹。', 'A Windows desktop Markdown reader. Your documents stay local; no account is required.\nThird-party licenses are in the application\'s THIRD_PARTY_NOTICES folder.') }) },
+      { label: 'About MoDu Reader', click: () => dialog.showMessageBox(win, { type: 'info', title: 'MoDu Reader', message: `MoDu Reader ${app.getVersion()}`, detail: 'A calm, offline Windows Markdown reader built for living AI, research, and repository docs.\nRead-only by design — your source files are never modified.\nThird-party licenses are in the application\'s THIRD_PARTY_NOTICES folder.' }) },
     ] },
   ]));
 }
@@ -105,16 +178,17 @@ async function createWindow() {
   win = new BrowserWindow({
     width: Math.max(860, Math.min(bounds.width || 1260, 2400)), height: Math.max(580, Math.min(bounds.height || 850, 1800)),
     ...(validPosition ? { x: bounds.x, y: bounds.y } : {}), minWidth: 720, minHeight: 540,
-    title: '墨读 · MoDu Reader', backgroundColor: '#ffffff', icon, show: false,
+    title: 'MoDu Reader', backgroundColor: '#ffffff', icon, show: false,
     webPreferences: { preload: path.join(__dirname, 'preload.cjs'), contextIsolation: true, sandbox: true, nodeIntegration: false, webSecurity: true, spellcheck: false },
   });
+  setNativeAlwaysOnTop(state.alwaysOnTop);
   win.webContents.setWindowOpenHandler(({ url }) => { const safe = externalUrl(url); if (safe) void shell.openExternal(safe).catch(report); return { action: 'deny' }; });
   win.webContents.on('will-navigate', (event, url) => { if (url.split('#')[0] !== indexURL) { event.preventDefault(); const safe = externalUrl(url); if (safe) void shell.openExternal(safe).catch(report); } });
   win.webContents.on('will-attach-webview', event => event.preventDefault());
   win.webContents.session.setPermissionRequestHandler((_contents, _permission, callback) => callback(false));
   win.webContents.session.setPermissionCheckHandler(() => false);
   win.webContents.on('did-start-loading', () => { rendererReady = false; });
-  win.webContents.on('render-process-gone', (_event, details) => { if (details.reason !== 'clean-exit') void dialog.showMessageBox({ type: 'error', message: '阅读窗口意外退出 / Reader stopped', detail: '请关闭并重新打开墨读。你的原始文件没有被更改。\nRestart MoDu Reader. Your original files have not been changed.' }); });
+  win.webContents.on('render-process-gone', (_event, details) => { if (details.reason !== 'clean-exit') void dialog.showMessageBox({ type: 'error', message: 'Reader stopped unexpectedly', detail: 'Restart MoDu Reader. Your original files have not been changed.' }); });
   win.on('close', () => { state.window = { ...win.getNormalBounds(), maximized: win.isMaximized() }; saveState(); });
   win.on('closed', () => { win = null; rendererReady = false; });
   win.once('ready-to-show', () => { if (state.window.maximized) win.maximize(); win.show(); });
@@ -127,7 +201,15 @@ else {
   app.on('open-file', (event, filename) => { event.preventDefault(); void queueOpen([filename]); });
   app.whenReady().then(async () => {
     stateFile = path.join(app.getPath('userData'), 'desktop-state.json');
-    try { const saved = JSON.parse(await fs.readFile(stateFile, 'utf8')); state = { recent: Array.isArray(saved.recent) ? saved.recent.filter(p => typeof p === 'string' && p.length < 32768).slice(0, 15) : [], window: saved.window && typeof saved.window === 'object' ? saved.window : state.window, locale: saved.locale === 'en' ? 'en' : 'zh' }; } catch {}
+    try {
+      const saved = JSON.parse(await fs.readFile(stateFile, 'utf8'));
+      state = {
+        recent: Array.isArray(saved.recent) ? saved.recent.filter(p => typeof p === 'string' && p.length < 32768).slice(0, 15) : [],
+        window: saved.window && typeof saved.window === 'object' ? saved.window : state.window,
+        liveWatch: typeof saved.liveWatch === 'boolean' ? saved.liveWatch : true,
+        alwaysOnTop: saved.alwaysOnTop === true,
+      };
+    } catch {}
     protocol.handle('modu-media', async request => {
       try {
         const u = new URL(request.url); const filename = documents.get(u.hostname);
@@ -139,10 +221,50 @@ else {
       } catch { return new Response(null, { status: 404 }); }
     });
     handle('modu:open', () => openDialog());
-    handle('modu:ready', () => { rendererReady = true; const batch = pending; pending = []; if (batch.length) send('modu:documents', batch); for (const message of pendingErrors) send('modu:error', message); pendingErrors = []; return { version: app.getVersion() }; });
+    handle('modu:open-folder', () => openFolderDialog());
+    handle('modu:open-folder-file', async targetPath => {
+      if (!activeFolderRoot || typeof targetPath !== 'string' || targetPath.length > 32768) throw new Error('No active folder selected');
+      const real = await fs.realpath(targetPath);
+      if (!isInside(activeFolderRoot, real)) throw new Error('File is outside the active folder');
+      await queueOpen([real]);
+    });
+    handle('modu:open-linked', async (sourceId, href) => {
+      const sourcePath = documents.get(sourceId);
+      if (!sourcePath) throw new Error('Open a local file to follow relative Markdown links');
+      const boundary = activeFolderRoot && isInside(activeFolderRoot, sourcePath) ? activeFolderRoot : null;
+      const resolved = await resolveLinkedDocument(sourcePath, href, boundary);
+      await queueOpen([resolved.path], resolved.fragment);
+      return { ok: true, fragment: resolved.fragment };
+    });
+    handle('modu:close-file', id => {
+      const filePath = documents.get(id);
+      stopWatcher(id);
+      if (filePath) { documents.delete(id); byPath.delete(filePath); }
+    });
+    handle('modu:ready', () => {
+      rendererReady = true;
+      const batch = pending; pending = [];
+      if (batch.length) send('modu:documents', batch);
+      for (const message of pendingErrors) send('modu:error', message);
+      pendingErrors = [];
+      return { version: app.getVersion(), liveWatch: state.liveWatch, alwaysOnTop: state.alwaysOnTop };
+    });
     handle('modu:drop', paths => { if (!Array.isArray(paths) || paths.length > 50 || paths.some(p => typeof p !== 'string' || p.length > 32768)) throw new Error('Invalid files'); return queueOpen(paths); });
     handle('modu:reload', id => { const filename = documents.get(id); if (!filename) throw new Error('Unknown document'); return queueOpen([filename]); });
-    handle('modu:locale', locale => { if (!['zh', 'en'].includes(locale)) return; state.locale = locale; buildMenu(); saveState(); });
+    handle('modu:live-watch', enabled => {
+      state.liveWatch = enabled === true;
+      saveState(); buildMenu();
+      if (!state.liveWatch) stopAllWatchers();
+      else { for (const [id, filePath] of documents.entries()) { void readDocument(filePath).then(d => ensureWatcher(id, filePath, d.content)).catch(() => {}); } }
+      return { liveWatch: state.liveWatch };
+    });
+    handle('modu:pin', enabled => {
+      state.alwaysOnTop = enabled === true;
+      setNativeAlwaysOnTop(state.alwaysOnTop);
+      saveState(); buildMenu();
+      return { alwaysOnTop: state.alwaysOnTop };
+    });
+    handle('modu:export-pdf', suggestedName => exportPdfDialog(suggestedName));
     buildMenu();
     await createWindow();
     await queueOpen(fileArguments(process.argv.slice(app.isPackaged ? 1 : 2), process.cwd()));
@@ -152,6 +274,7 @@ else {
   app.on('before-quit', event => {
     if (flushed) return;
     event.preventDefault();
+    stopAllWatchers();
     if (win && !win.isDestroyed()) state.window = { ...win.getNormalBounds(), maximized: win.isMaximized() };
     saveState();
     void writeQueue.finally(() => { flushed = true; app.quit(); });

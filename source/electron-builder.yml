@@ -15,10 +15,10 @@ npmRebuild: false
 extraFiles:
   - from: ../LICENSE
     to: LICENSE-MoDu.txt
-  - from: ../使用说明.txt
-    to: 使用说明.txt
-  - from: ../示例文档.md
-    to: 示例文档.md
+  - from: ../QUICKSTART.txt
+    to: QUICKSTART.txt
+  - from: ../sample-document.md
+    to: sample-document.md
   - from: dist/THIRD_PARTY_NOTICES
     to: THIRD_PARTY_NOTICES
 win:
@@ -40,9 +40,9 @@ nsis:
   createStartMenuShortcut: true
   shortcutName: MoDu Reader
   include: desktop/installer.nsh
-  installerLanguages: [zh_CN, en_US]
-  language: 2052
-  displayLanguageSelector: true
+  installerLanguages: [en_US]
+  language: 1033
+  displayLanguageSelector: false
   runAfterFinish: false
   deleteAppDataOnUninstall: false
 publish: null

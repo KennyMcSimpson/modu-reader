@@ -6,13 +6,21 @@ const subscribe = (channel, callback) => {
   ipcRenderer.on(channel, listener);
   return () => ipcRenderer.removeListener(channel, listener);
 };
+
 contextBridge.exposeInMainWorld('moduDesktop', Object.freeze({
   platform: process.platform,
   openFiles: () => ipcRenderer.invoke('modu:open'),
+  openFolder: () => ipcRenderer.invoke('modu:open-folder'),
+  openFolderFile: targetPath => ipcRenderer.invoke('modu:open-folder-file', targetPath),
+  openLinked: (sourceId, href) => ipcRenderer.invoke('modu:open-linked', sourceId, href),
+  closeFile: id => ipcRenderer.invoke('modu:close-file', id),
   ready: () => ipcRenderer.invoke('modu:ready'),
   reloadFile: id => ipcRenderer.invoke('modu:reload', id),
-  setLocale: locale => ipcRenderer.invoke('modu:locale', locale),
+  setLiveWatch: enabled => ipcRenderer.invoke('modu:live-watch', enabled),
+  setAlwaysOnTop: enabled => ipcRenderer.invoke('modu:pin', enabled),
+  exportPdf: suggestedName => ipcRenderer.invoke('modu:export-pdf', suggestedName),
   onDocuments: callback => subscribe('modu:documents', callback),
+  onDocumentUpdated: callback => subscribe('modu:document-updated', callback),
   onAction: callback => subscribe('modu:action', callback),
   onError: callback => subscribe('modu:error', callback),
 }));

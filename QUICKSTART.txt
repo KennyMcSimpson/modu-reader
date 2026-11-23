@@ -1,0 +1,39 @@
+MoDu Reader 2.1.0 — Quick Start (Windows x64)
+=============================================
+
+Thank you for using MoDu Reader, an offline Windows Markdown reader built for
+living AI, research, and repository documentation.
+
+HOW TO OPEN DOCUMENTS
+---------------------
+1. Click "Open file" (Ctrl+O), drag Markdown files into the window, or pass a
+   file on the command line.
+2. Click "Open folder" (Ctrl+Shift+O) to browse a repository folder in strict
+   read-only mode (MoDu never creates vault folders or edits your files).
+3. Click "Paste text" (Ctrl+Shift+V) to inspect Markdown directly from the
+   clipboard.
+4. With the installed version, select "MoDu Reader" under Windows "Open with"
+   to open .md files directly from File Explorer.
+
+LIVING DOCUMENT & TECHNICAL FEATURES
+------------------------------------
+- Live Diff-Watch: Automatically reloads opened local files when external tools
+  or AI agents edit them on disk, preserving your scroll position and
+  highlighting changed sections with a "Next change" jump button.
+- Relative Links & History: Click relative .md links inside an authorized
+  folder and step Back / Forward with Alt+Left / Alt+Right.
+- Read / Split / Source: Compare rendered Markdown and raw source side-by-side.
+- Interactive Tools: Click any Mermaid diagram or image to zoom/pan and copy
+  sanitized SVG; hover equations to copy raw LaTeX; hover tables to copy
+  RFC-4180 CSV or TSV; copy selected text as a formatted Markdown citation.
+- Export PDF (Ctrl+P) & Always on Top (Ctrl+Shift+T).
+
+PORTABLE ZIP NOTE
+-----------------
+If you downloaded the portable ZIP, extract the entire archive before launching
+"MoDu Reader.exe". Keep neighboring DLL/resource files beside the executable.
+
+PRIVACY
+-------
+All documents stay local in memory. No accounts, telemetry, or network uploads.
+Source code and release checksums: https://github.com/KennyMcSimpson/modu-reader

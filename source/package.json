@@ -1,8 +1,8 @@
 {
   "name": "modu-reader",
-  "version": "2.0.0",
+  "version": "2.1.0",
   "private": false,
-  "description": "A private, offline Markdown reader for Windows.",
+  "description": "Offline Windows Markdown reader for living AI, research, and repository docs — with live diff-watch, interactive Mermaid/KaTeX/table tools, and read-only folder navigation.",
   "license": "MIT",
   "repository": {
     "type": "git",
@@ -29,7 +29,7 @@
     "build": "node scripts/build-desktop.mjs",
     "build:html": "node scripts/build-offline.mjs",
     "typecheck": "tsc --noEmit",
-    "test": "node --test desktop/tests/*.test.cjs",
+    "test": "node --test desktop/tests/*.test.cjs desktop/tests/*.test.mjs",
     "test:desktop": "node scripts/smoke-desktop.mjs",
     "dist:win": "pnpm run build && electron-builder --config electron-builder.yml --win --x64 --publish never"
   },
