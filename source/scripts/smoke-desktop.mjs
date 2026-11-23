@@ -58,7 +58,7 @@ try {
 
   // Verify Split view shows both rendered article and source panel.
   await page.getByRole('tab', { name: 'Split', exact: true }).click();
-  await page.locator('.split-panel pre').waitFor();
+  await page.locator('.split-pane-source pre[aria-label="Markdown source"]').waitFor();
   await page.getByRole('tab', { name: 'Read', exact: true }).click();
 
   // Exercise native menu commands through the same handler as Ctrl+F.
@@ -151,7 +151,8 @@ try {
     checks: [
       'real-executable', 'version-match', 'command-line-open', 'native-dialog',
       'frontmatter', 'github-alerts', 'relative-image', 'table', 'math', 'mermaid',
-      'split-view', 'find', 'relative-md-link', 'live-diff-watch', 'reload',
+      'split-view', 'find', 'relative-md-link', 'folder-drawer', 'always-on-top',
+      'export-pdf', 'live-diff-watch', 'reload',
       'paste', 'second-instance', 'sandbox', 'offline',
     ],
     errors,
