@@ -1,5 +1,5 @@
-appId: io.github.kennymcsimpson.modu
-productName: MoDu Reader
+appId: io.github.kennymcsimpson.inkglass
+productName: Inkglass
 electronVersion: 44.9.1
 directories:
   app: dist/app
@@ -14,7 +14,7 @@ asar: true
 npmRebuild: false
 extraFiles:
   - from: ../LICENSE
-    to: LICENSE-MoDu.txt
+    to: LICENSE-Inkglass.txt
   - from: ../QUICKSTART.txt
     to: QUICKSTART.txt
   - from: ../sample-document.md
@@ -22,23 +22,23 @@ extraFiles:
   - from: dist/THIRD_PARTY_NOTICES
     to: THIRD_PARTY_NOTICES
 win:
-  executableName: MoDu Reader
+  executableName: Inkglass
   icon: desktop/assets/icon.ico
   target:
     - target: zip
       arch: [x64]
     - target: nsis
       arch: [x64]
-  artifactName: MoDu-Reader-${version}-Windows-${arch}.${ext}
+  artifactName: Inkglass-${version}-Windows-${arch}.${ext}
 nsis:
-  artifactName: MoDu-Reader-${version}-Setup-${arch}.${ext}
+  artifactName: Inkglass-${version}-Setup-${arch}.${ext}
   oneClick: false
   perMachine: false
   allowElevation: false
   allowToChangeInstallationDirectory: true
   createDesktopShortcut: true
   createStartMenuShortcut: true
-  shortcutName: MoDu Reader
+  shortcutName: Inkglass
   include: desktop/installer.nsh
   installerLanguages: [en_US]
   language: 1033

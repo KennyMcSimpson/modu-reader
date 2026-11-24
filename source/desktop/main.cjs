@@ -5,13 +5,14 @@ const { pathToFileURL } = require('node:url');
 const { randomUUID } = require('node:crypto');
 const {
   readDocument, resolveImage, resolveLinkedDocument, listFolderDocuments,
-  createFileWatcher, fileArguments, externalUrl, isInside,
+  createFileWatcher, migrateLegacyState, fileArguments, externalUrl, isInside,
 } = require('./files.cjs');
 
-const APP_ID = 'io.github.kennymcsimpson.modu';
+const APP_ID = 'io.github.kennymcsimpson.inkglass';
 const indexFile = path.join(__dirname, '../dist/desktop/index.html');
 const indexURL = pathToFileURL(indexFile).href;
 const icon = path.join(__dirname, 'assets/icon.png');
+const TEST_USER_DATA = process.env.INKGLASS_TEST_USER_DATA || process.env.MODU_TEST_USER_DATA || '';
 let win;
 let state = { recent: [], window: { width: 1260, height: 850 }, liveWatch: true, alwaysOnTop: false };
 let stateFile;
@@ -25,10 +26,10 @@ const documents = new Map();
 const byPath = new Map();
 const watchers = new Map();
 
-app.setName('MoDu Reader');
+app.setName('Inkglass');
 app.setAppUserModelId(APP_ID);
-if (!app.isPackaged && process.env.NODE_ENV === 'test' && process.env.MODU_TEST_USER_DATA) app.setPath('userData', process.env.MODU_TEST_USER_DATA);
-protocol.registerSchemesAsPrivileged([{ scheme: 'modu-media', privileges: { secure: true, standard: true, supportFetchAPI: true } }]);
+if (!app.isPackaged && process.env.NODE_ENV === 'test' && TEST_USER_DATA) app.setPath('userData', TEST_USER_DATA);
+protocol.registerSchemesAsPrivileged([{ scheme: 'inkglass-media', privileges: { secure: true, standard: true, supportFetchAPI: true } }]);
 
 function saveState() {
   const data = JSON.stringify(state, null, 2);
@@ -40,8 +41,8 @@ function saveState() {
   }).catch(() => {});
 }
 function send(channel, payload) { if (win && !win.isDestroyed()) win.webContents.send(channel, payload); }
-function report(error) { const message = error instanceof Error ? error.message : String(error); if (rendererReady) send('modu:error', message); else pendingErrors.push(message); }
-function deliver(batch) { if (rendererReady) send('modu:documents', batch); else pending.push(...batch); }
+function report(error) { const message = error instanceof Error ? error.message : String(error); if (rendererReady) send('inkglass:error', message); else pendingErrors.push(message); }
+function deliver(batch) { if (rendererReady) send('inkglass:documents', batch); else pending.push(...batch); }
 
 function setNativeAlwaysOnTop(enabled) {
   if (!win || win.isDestroyed()) return;
@@ -63,7 +64,7 @@ function ensureWatcher(id, filePath, initialContent) {
   stopWatcher(id);
   if (!state.liveWatch || !documents.has(id)) return;
   const watcher = createFileWatcher(filePath, initialContent, updated => {
-    send('modu:document-updated', { id, ...updated, watched: true });
+    send('inkglass:document-updated', { id, ...updated, watched: true });
   });
   watchers.set(id, watcher);
 }
@@ -129,7 +130,7 @@ function handle(channel, callback) { ipcMain.handle(channel, async (event, ...ar
 function focusWindow() { if (!win) return; if (win.isMinimized()) win.restore(); win.show(); win.focus(); }
 
 function buildMenu() {
-  const action = name => () => send('modu:action', name);
+  const action = name => () => send('inkglass:action', name);
   const recents = state.recent.map(filename => ({ label: path.basename(filename).replaceAll('&', '&&'), sublabel: path.dirname(filename), click: () => queueOpen([filename]) }));
   Menu.setApplicationMenu(Menu.buildFromTemplate([
     { label: '&File', submenu: [
@@ -153,21 +154,21 @@ function buildMenu() {
         saveState();
         if (!state.liveWatch) stopAllWatchers();
         else { for (const [id, filePath] of documents.entries()) { void readDocument(filePath).then(d => ensureWatcher(id, filePath, d.content)).catch(() => {}); } }
-        send('modu:action', state.liveWatch ? 'watch-on' : 'watch-off');
+        send('inkglass:action', state.liveWatch ? 'watch-on' : 'watch-off');
       } },
       { id: 'always-on-top', label: 'Always on Top', type: 'checkbox', checked: state.alwaysOnTop, accelerator: 'CmdOrCtrl+Shift+T', click: item => {
         state.alwaysOnTop = item.checked;
         setNativeAlwaysOnTop(state.alwaysOnTop);
         saveState();
-        send('modu:action', state.alwaysOnTop ? 'pin-on' : 'pin-off');
+        send('inkglass:action', state.alwaysOnTop ? 'pin-on' : 'pin-off');
       } },
       { label: 'Focus Mode', accelerator: 'CmdOrCtrl+Shift+F', click: action('focus') },
       { role: 'togglefullscreen', label: 'Fullscreen' }, { type: 'separator' },
       { role: 'resetZoom', label: 'Reset Zoom' }, { role: 'zoomIn', label: 'Zoom In' }, { role: 'zoomOut', label: 'Zoom Out' },
     ] },
     { label: '&Help', submenu: [
-      { label: 'GitHub', click: () => shell.openExternal('https://github.com/KennyMcSimpson/modu-reader') },
-      { label: 'About MoDu Reader', click: () => dialog.showMessageBox(win, { type: 'info', title: 'MoDu Reader', message: `MoDu Reader ${app.getVersion()}`, detail: 'A calm, offline Windows Markdown reader built for living AI, research, and repository docs.\nRead-only by design — your source files are never modified.\nThird-party licenses are in the application\'s THIRD_PARTY_NOTICES folder.' }) },
+      { label: 'GitHub', click: () => shell.openExternal('https://github.com/KennyMcSimpson/inkglass') },
+      { label: 'About Inkglass', click: () => dialog.showMessageBox(win, { type: 'info', title: 'Inkglass', message: `Inkglass ${app.getVersion()}`, detail: 'A calm, offline Windows Markdown reader built for living AI, research, and repository docs.\nRead-only by design — your source files are never modified.\nThird-party licenses are in the application\'s THIRD_PARTY_NOTICES folder.' }) },
     ] },
   ]));
 }
@@ -178,7 +179,7 @@ async function createWindow() {
   win = new BrowserWindow({
     width: Math.max(860, Math.min(bounds.width || 1260, 2400)), height: Math.max(580, Math.min(bounds.height || 850, 1800)),
     ...(validPosition ? { x: bounds.x, y: bounds.y } : {}), minWidth: 720, minHeight: 540,
-    title: 'MoDu Reader', backgroundColor: '#ffffff', icon, show: false,
+    title: 'Inkglass', backgroundColor: '#ffffff', icon, show: false,
     webPreferences: { preload: path.join(__dirname, 'preload.cjs'), contextIsolation: true, sandbox: true, nodeIntegration: false, webSecurity: true, spellcheck: false },
   });
   setNativeAlwaysOnTop(state.alwaysOnTop);
@@ -188,7 +189,7 @@ async function createWindow() {
   win.webContents.session.setPermissionRequestHandler((_contents, _permission, callback) => callback(false));
   win.webContents.session.setPermissionCheckHandler(() => false);
   win.webContents.on('did-start-loading', () => { rendererReady = false; });
-  win.webContents.on('render-process-gone', (_event, details) => { if (details.reason !== 'clean-exit') void dialog.showMessageBox({ type: 'error', message: 'Reader stopped unexpectedly', detail: 'Restart MoDu Reader. Your original files have not been changed.' }); });
+  win.webContents.on('render-process-gone', (_event, details) => { if (details.reason !== 'clean-exit') void dialog.showMessageBox({ type: 'error', message: 'Reader stopped unexpectedly', detail: 'Restart Inkglass. Your original files have not been changed.' }); });
   win.on('close', () => { state.window = { ...win.getNormalBounds(), maximized: win.isMaximized() }; saveState(); });
   win.on('closed', () => { win = null; rendererReady = false; });
   win.once('ready-to-show', () => { if (state.window.maximized) win.maximize(); win.show(); });
@@ -200,7 +201,13 @@ else {
   app.on('second-instance', (_event, argv, cwd) => { void queueOpen(fileArguments(argv.slice(1), cwd)); focusWindow(); });
   app.on('open-file', (event, filename) => { event.preventDefault(); void queueOpen([filename]); });
   app.whenReady().then(async () => {
-    stateFile = path.join(app.getPath('userData'), 'desktop-state.json');
+    const userDataDir = app.getPath('userData');
+    if (!TEST_USER_DATA) {
+      try {
+        await migrateLegacyState(path.join(app.getPath('appData'), 'MoDu Reader'), userDataDir);
+      } catch {}
+    }
+    stateFile = path.join(userDataDir, 'desktop-state.json');
     try {
       const saved = JSON.parse(await fs.readFile(stateFile, 'utf8'));
       state = {
@@ -210,7 +217,7 @@ else {
         alwaysOnTop: saved.alwaysOnTop === true,
       };
     } catch {}
-    protocol.handle('modu-media', async request => {
+    protocol.handle('inkglass-media', async request => {
       try {
         const u = new URL(request.url); const filename = documents.get(u.hostname);
         if (!filename || !['GET', 'HEAD'].includes(request.method)) return new Response(null, { status: 403 });
@@ -220,15 +227,15 @@ else {
         return new Response(request.method === 'HEAD' ? null : data, { headers: { 'content-type': image.mime, 'content-security-policy': "default-src 'none'; style-src 'unsafe-inline'", 'x-content-type-options': 'nosniff' } });
       } catch { return new Response(null, { status: 404 }); }
     });
-    handle('modu:open', () => openDialog());
-    handle('modu:open-folder', () => openFolderDialog());
-    handle('modu:open-folder-file', async targetPath => {
+    handle('inkglass:open', () => openDialog());
+    handle('inkglass:open-folder', () => openFolderDialog());
+    handle('inkglass:open-folder-file', async targetPath => {
       if (!activeFolderRoot || typeof targetPath !== 'string' || targetPath.length > 32768) throw new Error('No active folder selected');
       const real = await fs.realpath(targetPath);
       if (!isInside(activeFolderRoot, real)) throw new Error('File is outside the active folder');
       await queueOpen([real]);
     });
-    handle('modu:open-linked', async (sourceId, href) => {
+    handle('inkglass:open-linked', async (sourceId, href) => {
       const sourcePath = documents.get(sourceId);
       if (!sourcePath) throw new Error('Open a local file to follow relative Markdown links');
       const boundary = activeFolderRoot && isInside(activeFolderRoot, sourcePath) ? activeFolderRoot : null;
@@ -236,39 +243,39 @@ else {
       await queueOpen([resolved.path], resolved.fragment);
       return { ok: true, fragment: resolved.fragment };
     });
-    handle('modu:close-file', id => {
+    handle('inkglass:close-file', id => {
       const filePath = documents.get(id);
       stopWatcher(id);
       if (filePath) { documents.delete(id); byPath.delete(filePath); }
     });
-    handle('modu:ready', () => {
+    handle('inkglass:ready', () => {
       rendererReady = true;
       const batch = pending; pending = [];
-      if (batch.length) send('modu:documents', batch);
-      for (const message of pendingErrors) send('modu:error', message);
+      if (batch.length) send('inkglass:documents', batch);
+      for (const message of pendingErrors) send('inkglass:error', message);
       pendingErrors = [];
       return { version: app.getVersion(), liveWatch: state.liveWatch, alwaysOnTop: state.alwaysOnTop };
     });
-    handle('modu:drop', paths => { if (!Array.isArray(paths) || paths.length > 50 || paths.some(p => typeof p !== 'string' || p.length > 32768)) throw new Error('Invalid files'); return queueOpen(paths); });
-    handle('modu:reload', id => { const filename = documents.get(id); if (!filename) throw new Error('Unknown document'); return queueOpen([filename]); });
-    handle('modu:live-watch', enabled => {
+    handle('inkglass:drop', paths => { if (!Array.isArray(paths) || paths.length > 50 || paths.some(p => typeof p !== 'string' || p.length > 32768)) throw new Error('Invalid files'); return queueOpen(paths); });
+    handle('inkglass:reload', id => { const filename = documents.get(id); if (!filename) throw new Error('Unknown document'); return queueOpen([filename]); });
+    handle('inkglass:live-watch', enabled => {
       state.liveWatch = enabled === true;
       saveState(); buildMenu();
       if (!state.liveWatch) stopAllWatchers();
       else { for (const [id, filePath] of documents.entries()) { void readDocument(filePath).then(d => ensureWatcher(id, filePath, d.content)).catch(() => {}); } }
       return { liveWatch: state.liveWatch };
     });
-    handle('modu:pin', enabled => {
+    handle('inkglass:pin', enabled => {
       state.alwaysOnTop = enabled === true;
       setNativeAlwaysOnTop(state.alwaysOnTop);
       saveState(); buildMenu();
       return { alwaysOnTop: state.alwaysOnTop };
     });
-    handle('modu:export-pdf', suggestedName => exportPdfDialog(suggestedName));
+    handle('inkglass:export-pdf', suggestedName => exportPdfDialog(suggestedName));
     buildMenu();
     await createWindow();
     await queueOpen(fileArguments(process.argv.slice(app.isPackaged ? 1 : 2), process.cwd()));
-  }).catch(error => { dialog.showErrorBox('MoDu Reader', error.message); app.quit(); });
+  }).catch(error => { dialog.showErrorBox('Inkglass', error.message); app.quit(); });
   app.on('window-all-closed', () => app.quit());
   let flushed = false;
   app.on('before-quit', event => {

@@ -1,17 +1,17 @@
 {
-  "name": "modu-reader",
-  "version": "2.1.0",
+  "name": "inkglass",
+  "version": "2.2.0",
   "private": false,
   "description": "Offline Windows Markdown reader for living AI, research, and repository docs — with live diff-watch, interactive Mermaid/KaTeX/table tools, and read-only folder navigation.",
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/KennyMcSimpson/modu-reader.git"
+    "url": "git+https://github.com/KennyMcSimpson/inkglass.git"
   },
   "bugs": {
-    "url": "https://github.com/KennyMcSimpson/modu-reader/issues"
+    "url": "https://github.com/KennyMcSimpson/inkglass/issues"
   },
-  "homepage": "https://github.com/KennyMcSimpson/modu-reader",
+  "homepage": "https://github.com/KennyMcSimpson/inkglass",
   "keywords": [
     "markdown",
     "reader",

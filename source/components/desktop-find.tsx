@@ -25,12 +25,12 @@ export function DesktopFind({
     if (!ranges.length) {
       active.current = -1;
       setResult({ active: 0, total: 0 });
-      CSS.highlights.delete("modu-find-active");
+      CSS.highlights.delete("inkglass-find-active");
       return;
     }
     const selected = (index + ranges.length) % ranges.length;
     active.current = selected;
-    CSS.highlights.set("modu-find-active", new Highlight(ranges[selected]));
+    CSS.highlights.set("inkglass-find-active", new Highlight(ranges[selected]));
     setResult({ active: selected + 1, total: ranges.length });
     const area = document.querySelector<HTMLElement>(".document-scroll");
     const bounds = ranges[selected].getBoundingClientRect();
@@ -52,8 +52,8 @@ export function DesktopFind({
     let timer: ReturnType<typeof setTimeout>;
     const root = document.querySelector(mode === "source" ? ".source-panel pre[aria-label]" : ".reading-panel article");
     const rebuild = () => {
-      CSS.highlights.delete("modu-find");
-      CSS.highlights.delete("modu-find-active");
+      CSS.highlights.delete("inkglass-find");
+      CSS.highlights.delete("inkglass-find-active");
       matches.current = [];
       active.current = -1;
       if (!root || !query) {
@@ -93,7 +93,7 @@ export function DesktopFind({
         if (ranges.length >= MAX_MATCHES) break;
       }
       matches.current = ranges;
-      CSS.highlights.set("modu-find", new Highlight(...ranges));
+      CSS.highlights.set("inkglass-find", new Highlight(...ranges));
       selectMatch(0);
     };
     const schedule = () => {
@@ -106,8 +106,8 @@ export function DesktopFind({
     return () => {
       clearTimeout(timer);
       observer.disconnect();
-      CSS.highlights.delete("modu-find");
-      CSS.highlights.delete("modu-find-active");
+      CSS.highlights.delete("inkglass-find");
+      CSS.highlights.delete("inkglass-find-active");
     };
   }, [query, documentId, content, mode, selectMatch]);
 

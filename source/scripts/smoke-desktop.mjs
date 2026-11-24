@@ -5,7 +5,7 @@ import { spawn } from 'node:child_process';
 import os from 'node:os';
 import path from 'node:path';
 
-const fixture = await mkdtemp(path.join(os.tmpdir(), 'modu-smoke-'));
+const fixture = await mkdtemp(path.join(os.tmpdir(), 'inkglass-smoke-'));
 const results = path.resolve('test-results');
 await mkdir(results, { recursive: true });
 await mkdir(path.join(fixture, 'images'));
@@ -15,16 +15,16 @@ await writeFile(linkedFile, '# Linked Document\n\n## Details\n\nReached via rela
 const filename = path.join(fixture, '中文 file.md');
 await writeFile(
   filename,
-  '---\ntitle: Desktop Smoke\nstatus: verified\ntags: [offline, windows]\n---\n\n# Desktop smoke test\n\nOffline reading check. SearchNeedle is here. SearchNeedle is here again.\n\n> [!TIP]\n> GitHub Alerts render natively without external plugins.\n\nSee [linked doc](./linked.md#details) for details.\n\n![local image](images/local%20image.png)\n\n## Features\n\n| A | B |\n|---|---|\n| one | two |\n\nInline $E=mc^2$.\n\n$$\n\\frac{1}{2} + \\sqrt{x}\n$$\n\n```js\nconst local = true;\n```\n\n```mermaid\ngraph TD\n  A[Local file] --> B[Desktop reader]\n```\n\n<script>window.__moduUntrustedMarkdownExecuted=true</script>\n',
+  '---\ntitle: Desktop Smoke\nstatus: verified\ntags: [offline, windows]\n---\n\n# Desktop smoke test\n\nOffline reading check. SearchNeedle is here. SearchNeedle is here again.\n\n> [!TIP]\n> GitHub Alerts render natively without external plugins.\n\nSee [linked doc](./linked.md#details) for details.\n\n![local image](images/local%20image.png)\n\n## Features\n\n| A | B |\n|---|---|\n| one | two |\n\nInline $E=mc^2$.\n\n$$\n\\frac{1}{2} + \\sqrt{x}\n$$\n\n```js\nconst local = true;\n```\n\n```mermaid\ngraph TD\n  A[Local file] --> B[Desktop reader]\n```\n\n<script>window.__inkglassUntrustedMarkdownExecuted=true</script>\n',
 );
 const expectedPackage = JSON.parse(await readFile(new URL('../package.json', import.meta.url), 'utf8'));
-const executable = process.env.MODU_EXECUTABLE;
+const executable = process.env.INKGLASS_EXECUTABLE || process.env.MODU_EXECUTABLE;
 const launchArgs = executable ? [filename] : ['.', filename];
 let app;
 const errors = [];
 const network = [];
 try {
-  app = await electron.launch({ ...(executable ? { executablePath: path.resolve(executable) } : {}), args: launchArgs, timeout: 90000, env: { ...process.env, NODE_ENV: 'test', MODU_TEST_USER_DATA: path.join(fixture, 'profile') } });
+  app = await electron.launch({ ...(executable ? { executablePath: path.resolve(executable) } : {}), args: launchArgs, timeout: 90000, env: { ...process.env, NODE_ENV: 'test', INKGLASS_TEST_USER_DATA: path.join(fixture, 'profile') } });
   const page = await app.firstWindow();
   assert.equal(await app.evaluate(({ app }) => app.getVersion()), expectedPackage.version, 'The running app must match the release version');
   assert.equal(await app.evaluate(() => process.versions.electron), expectedPackage.devDependencies.electron, 'The running desktop runtime must match the pinned Electron dependency');
@@ -32,7 +32,7 @@ try {
   page.on('request', request => { if (/^https?:/.test(request.url())) network.push(request.url()); });
   await page.getByRole('heading', { name: 'Desktop smoke test', exact: true }).waitFor();
   assert.equal(await page.evaluate(() => typeof window.require), 'undefined');
-  assert.equal(await page.evaluate(() => window.__moduUntrustedMarkdownExecuted), undefined);
+  assert.equal(await page.evaluate(() => window.__inkglassUntrustedMarkdownExecuted), undefined);
   const prefs = await app.evaluate(({ BrowserWindow }) => {
     const p = BrowserWindow.getAllWindows()[0].webContents.getLastWebPreferences();
     return { sandbox: p.sandbox, contextIsolation: p.contextIsolation, nodeIntegration: p.nodeIntegration };
@@ -65,7 +65,7 @@ try {
   await app.evaluate(({ Menu }) => Menu.getApplicationMenu().getMenuItemById('find').click());
   await page.locator('.desktop-find input').fill('SearchNeedle');
   await page.waitForFunction(() => /1\s*\/\s*2/.test(document.querySelector('.find-count')?.textContent || ''));
-  assert.equal(await page.evaluate(() => CSS.highlights.get('modu-find').size), 2);
+  assert.equal(await page.evaluate(() => CSS.highlights.get('inkglass-find').size), 2);
   await page.locator('.desktop-find input').press('Enter');
   await page.waitForFunction(() => /2\s*\/\s*2/.test(document.querySelector('.find-count')?.textContent || ''));
   await page.locator('.desktop-find input').press('Shift+Enter');
@@ -129,7 +129,7 @@ try {
   // Playwright may launch Electron through cmd.exe on Windows.
   const childExecutable = executable || await app.evaluate(() => process.execPath);
   await new Promise((resolve, reject) => {
-    const child = spawn(childExecutable, childArgs, { env: { ...process.env, NODE_ENV: 'test', MODU_TEST_USER_DATA: path.join(fixture, 'profile') }, stdio: 'ignore' });
+    const child = spawn(childExecutable, childArgs, { env: { ...process.env, NODE_ENV: 'test', INKGLASS_TEST_USER_DATA: path.join(fixture, 'profile') }, stdio: 'ignore' });
     const timer = setTimeout(() => { child.kill(); reject(new Error('Second instance did not exit')); }, 20000);
     child.on('error', reject); child.on('exit', code => { clearTimeout(timer); code === 0 ? resolve() : reject(new Error(`Second instance exit ${code}`)); });
   });
@@ -141,7 +141,7 @@ try {
   await page.getByRole('heading', { name: 'Updated on disk', exact: true }).waitFor();
 
   // Capture the welcome layout as visual evidence of the packaged app.
-  await page.getByRole('button', { name: 'Welcome to MoDu', exact: true }).click();
+  await page.getByRole('button', { name: 'Welcome to Inkglass', exact: true }).click();
   await page.screenshot({ path: path.join(results, 'windows-reader.png') });
   assert.deepEqual(errors, [], 'Renderer must have no uncaught errors');
   assert.deepEqual(network, [], 'Local documents must not trigger remote requests');

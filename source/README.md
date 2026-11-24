@@ -1,6 +1,6 @@
-# MoDu Reader Desktop Source
+# Inkglass Desktop Source
 
-End users should download a compiled Windows portable ZIP or installer from [Releases](https://github.com/KennyMcSimpson/modu-reader/releases/latest).
+End users should download a compiled Windows portable ZIP or installer from [Releases](https://github.com/KennyMcSimpson/inkglass/releases/latest).
 
 ## Development
 
@@ -25,10 +25,10 @@ pnpm run dist:win
 
 | Path | Responsibility |
 | --- | --- |
-| `desktop/main.cjs` | Window lifecycle, native menus, live `fs.watch`, strictly scoped IPC, PDF export, always-on-top |
-| `desktop/preload.cjs` | Narrow `contextBridge` API (`window.moduDesktop`) + trusted OS file drop bridge |
-| `desktop/files.cjs` | Encoding detection, size/type limits, image/link boundary checks, read-only folder walker, debounced file watcher |
-| `desktop/installer.nsh` | Per-user Windows **Open with** registration |
+| `desktop/main.cjs` | Window lifecycle, native menus, live `fs.watch`, strictly scoped IPC, PDF export, always-on-top, legacy state migration |
+| `desktop/preload.cjs` | Narrow `contextBridge` API (`window.inkglassDesktop`) + trusted OS file drop bridge |
+| `desktop/files.cjs` | Encoding detection, size/type limits, image/link boundary checks, read-only folder walker, debounced file watcher, legacy state migration |
+| `desktop/installer.nsh` | Per-user Windows **Open with** registration (`Inkglass.Markdown`) |
 | `lib/frontmatter.ts` | Zero-dependency leading YAML frontmatter parser |
 | `lib/alerts.ts` | GitHub Alerts (`[!NOTE]` / `[!TIP]` / `[!IMPORTANT]` / `[!WARNING]` / `[!CAUTION]`) parser |
 | `lib/live-diff.ts` | Fence-aware heading section splitter and live-reload diff engine |
@@ -45,7 +45,7 @@ pnpm run dist:win
 - **Sandboxed renderer**: `sandbox: true`, `contextIsolation: true`, `nodeIntegration: false`, strict CSP (`connect-src 'none'`), and main-frame URL verification on every IPC handler.
 - **No arbitrary filesystem access**: Relative images and relative `.md` links are canonicalized via `fs.realpath` and verified inside the document directory (or user-selected folder root), rejecting `..` traversal and symlink/junction escapes.
 - **Tests**:
-  - `pnpm test` runs `desktop/tests/files.test.cjs` (encodings, limits, traversal/symlink escapes, folder walk bounds, real file watcher) and `desktop/tests/features.test.mjs` (frontmatter, GitHub Alerts, fence-aware live diff, CSV/TSV export, citations).
-  - `pnpm run test:desktop` launches the real Electron binary to verify version match, sandbox flags, zero remote requests, Frontmatter, GitHub Alerts, KaTeX, Mermaid, Split view, Find, relative `.md` links, Live Diff-Watch, Paste, and single-instance handoff.
+  - `pnpm test` runs `desktop/tests/files.test.cjs` (encodings, limits, traversal/symlink escapes, folder walk bounds, real file watcher, legacy state migration) and `desktop/tests/features.test.mjs` (frontmatter, GitHub Alerts, fence-aware live diff, CSV/TSV export, citations).
+  - `pnpm run test:desktop` launches the real Electron binary to verify version match, sandbox flags, zero remote requests, Frontmatter, GitHub Alerts, KaTeX, Mermaid, Split view, Find, relative `.md` links, Folder drawer, Always-on-Top, Export PDF, Live Diff-Watch, Paste, and single-instance handoff.
 
 The legacy single-file HTML build remains available via `pnpm run build:html`, though it is not part of the Windows desktop release packages.

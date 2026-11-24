@@ -50,19 +50,19 @@ jobs:
       - name: Run the EXE extracted from the portable ZIP
         run: |
           $zip = Get-ChildItem ../release/*-Windows-x64.zip | Select-Object -First 1
-          $portable = Join-Path $env:RUNNER_TEMP 'modu-portable'
+          $portable = Join-Path $env:RUNNER_TEMP 'inkglass-portable'
           Expand-Archive $zip.FullName -DestinationPath $portable
-          $env:MODU_EXECUTABLE = Join-Path $portable 'MoDu Reader.exe'
+          $env:INKGLASS_EXECUTABLE = Join-Path $portable 'Inkglass.exe'
           pnpm run test:desktop
       - name: Verify installer, file registration and installed EXE
         run: |
           $setup = Get-ChildItem ../release/*-Setup-x64.exe | Select-Object -First 1
-          $target = Join-Path $env:RUNNER_TEMP 'modu-installed'
+          $target = Join-Path $env:RUNNER_TEMP 'inkglass-installed'
           $process = Start-Process $setup.FullName -ArgumentList '/S', "/D=$target" -PassThru -Wait
           if ($process.ExitCode -ne 0) { throw "Installer failed: $($process.ExitCode)" }
-          $command = (Get-Item 'HKCU:\Software\Classes\MoDu.Reader.Markdown\shell\open\command').GetValue('')
-          if (-not $command.Contains('MoDu Reader.exe') -or -not $command.Contains('"%1"')) { throw 'Open-with registration is missing' }
-          $env:MODU_EXECUTABLE = Join-Path $target 'MoDu Reader.exe'
+          $command = (Get-Item 'HKCU:\Software\Classes\Inkglass.Markdown\shell\open\command').GetValue('')
+          if (-not $command.Contains('Inkglass.exe') -or -not $command.Contains('"%1"')) { throw 'Open-with registration is missing' }
+          $env:INKGLASS_EXECUTABLE = Join-Path $target 'Inkglass.exe'
           pnpm run test:desktop
       - name: Create checksums
         run: |
@@ -101,4 +101,4 @@ jobs:
           if ($tagLookupExit -eq 0) { throw "$tag already exists without a release; refusing to reuse it." }
           if ($tagLookupExit -ne 2) { throw "Could not verify that $tag is unused." }
           $notes = "../docs/releases/$tag.md"
-          gh release create $tag ../release/*-Windows-x64.zip ../release/*-Setup-x64.exe ../release/SHA256SUMS.txt --target $env:GITHUB_SHA --title "MoDu Reader $version · Windows" --notes-file $notes
+          gh release create $tag ../release/*-Windows-x64.zip ../release/*-Setup-x64.exe ../release/SHA256SUMS.txt --target $env:GITHUB_SHA --title "Inkglass $version · Windows" --notes-file $notes

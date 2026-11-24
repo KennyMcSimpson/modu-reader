@@ -350,8 +350,8 @@ button:focus-visible, a:focus-visible, summary:focus-visible { outline: 2px soli
 .find-count { font-size: 12px; min-width: 46px; text-align: center; font-variant-numeric: tabular-nums; }
 .desktop-find button:disabled { opacity: .35; }
 
-::highlight(modu-find) { background-color: #fff0a6; color: #222; }
-::highlight(modu-find-active) { background-color: #f4a05f; color: #171717; }
+::highlight(inkglass-find) { background-color: #fff0a6; color: #222; }
+::highlight(inkglass-find-active) { background-color: #f4a05f; color: #171717; }
 
 /* === v2.1 Living Technical Docs Styles === */
 .sidebar-secondary-actions { display: flex; gap: 4px; margin-top: 6px; }

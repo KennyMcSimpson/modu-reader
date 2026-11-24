@@ -6,7 +6,7 @@ import { fileURLToPath } from 'node:url';
 
 const root = fileURLToPath(new URL('../', import.meta.url));
 const packages = new Set();
-const csp = "default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; font-src 'self' data:; img-src 'self' data: blob: https: http: modu-media:; connect-src 'none'; object-src 'none'; frame-src 'none'; base-uri 'none'; form-action 'none'";
+const csp = "default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; font-src 'self' data:; img-src 'self' data: blob: https: http: inkglass-media:; connect-src 'none'; object-src 'none'; frame-src 'none'; base-uri 'none'; form-action 'none'";
 await build({
   root, configFile: false, base: './',
   plugins: [react(), {
@@ -37,7 +37,7 @@ await mkdir(stage, { recursive: true });
 await cp(path.join(root, 'desktop'), path.join(stage, 'desktop'), { recursive: true, filter: source => !source.includes(`${path.sep}tests`) && !source.endsWith('.nsh') });
 await cp(path.join(root, 'dist/desktop'), path.join(stage, 'dist/desktop'), { recursive: true });
 const pkg = JSON.parse(await readFile(path.join(root, 'package.json'), 'utf8'));
-await writeFile(path.join(stage, 'package.json'), JSON.stringify({ name: 'modu-reader', version: pkg.version, description: pkg.description, author: pkg.author, license: 'MIT', main: 'desktop/main.cjs' }, null, 2));
+await writeFile(path.join(stage, 'package.json'), JSON.stringify({ name: 'inkglass', version: pkg.version, description: pkg.description, author: pkg.author, license: 'MIT', main: 'desktop/main.cjs' }, null, 2));
 
 const notices = path.join(root, 'dist/THIRD_PARTY_NOTICES');
 await rm(notices, { recursive: true, force: true });

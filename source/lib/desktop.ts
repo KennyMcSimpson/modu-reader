@@ -58,8 +58,8 @@ export interface DesktopBridge {
 
 declare global {
   interface Window {
-    moduDesktop?: DesktopBridge;
+    inkglassDesktop?: DesktopBridge;
   }
 }
 
-export const desktop = typeof window !== "undefined" ? window.moduDesktop : undefined;
+export const desktop = typeof window !== "undefined" ? window.inkglassDesktop : undefined;

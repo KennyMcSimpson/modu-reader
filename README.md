@@ -1,15 +1,17 @@
-# MoDu Reader
+# Inkglass
 
-[![Windows desktop](https://github.com/KennyMcSimpson/modu-reader/actions/workflows/windows-release.yml/badge.svg)](https://github.com/KennyMcSimpson/modu-reader/actions/workflows/windows-release.yml)
-[![Latest release](https://img.shields.io/github/v/release/KennyMcSimpson/modu-reader)](https://github.com/KennyMcSimpson/modu-reader/releases/latest)
+[![Windows desktop](https://github.com/KennyMcSimpson/inkglass/actions/workflows/windows-release.yml/badge.svg)](https://github.com/KennyMcSimpson/inkglass/actions/workflows/windows-release.yml)
+[![Latest release](https://img.shields.io/github/v/release/KennyMcSimpson/inkglass)](https://github.com/KennyMcSimpson/inkglass/releases/latest)
 
 **The offline Windows Markdown reader built for living AI, research, and repository docs.**
 
-Open any local `.md` file or folder — without creating `.obsidian/` folders, vault indexes, or touching a single byte of your files. When an AI coding agent, build script, or external editor rewrites the file on disk, MoDu automatically live-reloads it, highlights which sections changed, and keeps your exact scroll position.
+Open any local `.md` file or folder — without creating `.obsidian/` folders, vault indexes, or touching a single byte of your files. When an AI coding agent, build script, or external editor rewrites the file on disk, Inkglass automatically live-reloads it, highlights which sections changed, and keeps your exact scroll position.
 
-## Why MoDu Instead of Typora / Obsidian / VS Code Preview?
+> Formerly known as **MoDu Reader**. On Windows desktop, existing window bounds, recent file paths, live-watch, and pin state (`desktop-state.json`) from `%APPDATA%\MoDu Reader` are imported automatically on first launch without altering your previous folder.
 
-| Need | Mainstream Tools | MoDu Reader 2.1 |
+## Why Inkglass Instead of Typora / Obsidian / VS Code Preview?
+
+| Need | Mainstream Tools | Inkglass 2.2 |
 | --- | --- | --- |
 | Read docs inside a Git repo | Obsidian creates `.obsidian/` vaults; editors risk accidental keystrokes | **Strict Read-Only** — zero repo pollution, zero accidental edits |
 | Follow AI agent plans (`PLAN.md`, reports) | Manual `F5` reload or scrolling jumps back to top | **Live Diff-Watch** — auto-reloads on disk edits, highlights changed sections, and jumps straight to the next change |
@@ -19,17 +21,17 @@ Open any local `.md` file or folder — without creating `.obsidian/` folders, v
 
 ## Download (Windows 10 / 11 x64)
 
-**[Download latest release](https://github.com/KennyMcSimpson/modu-reader/releases/latest)**
+**[Download latest release](https://github.com/KennyMcSimpson/inkglass/releases/latest)**
 
 | Package | How to use |
 | --- | --- |
-| [Portable ZIP](https://github.com/KennyMcSimpson/modu-reader/releases/latest/download/MoDu-Reader-2.1.0-Windows-x64.zip) | Extract the full archive and run `MoDu Reader.exe`. Keep neighboring files beside the EXE. |
-| [Windows Installer](https://github.com/KennyMcSimpson/modu-reader/releases/latest/download/MoDu-Reader-2.1.0-Setup-x64.exe) | Per-user installer with Start Menu / Desktop shortcut and Windows **Open with** registration. |
+| [Portable ZIP](https://github.com/KennyMcSimpson/inkglass/releases/latest/download/Inkglass-2.2.0-Windows-x64.zip) | Extract the full archive and run `Inkglass.exe`. Keep neighboring files beside the EXE. |
+| [Windows Installer](https://github.com/KennyMcSimpson/inkglass/releases/latest/download/Inkglass-2.2.0-Setup-x64.exe) | Per-user installer with Start Menu / Desktop shortcut and Windows **Open with** registration. |
 
 > [!NOTE]
 > GitHub's **Code → Download ZIP** contains source code, not the compiled Windows application. Release binaries are currently unsigned; Windows SmartScreen may show an unknown-publisher prompt. Verify every download against `SHA256SUMS.txt`.
 
-## Features in 2.1.0
+## Features
 
 - **Live Diff-Watch (`Radio` toggle)**: Watches opened local files for external changes (including atomic-rename editor saves), reloads without losing your scroll position, marks changed headings in the body and Table of Contents, and provides a **Next change** jump button.
 - **Read-Only Folder Drawer (`Ctrl+Shift+O`) & Relative `.md` Link Navigation**: Browse an entire repository's Markdown files without modifying anything, follow relative `[other](./guide.md#section)` links within the authorized folder boundary, and step through history with `Alt+Left` / `Alt+Right`.
@@ -61,7 +63,7 @@ Open any local `.md` file or folder — without creating `.obsidian/` folders, v
 
 ## Privacy
 
-Documents and pasted text are processed exclusively in local memory. There are no accounts, cloud sync, analytics, or update pings. Only preferences, window bounds, recent paths (clearable from **File → Open Recent**), and per-file scroll offsets are saved locally. MoDu never modifies your Markdown files.
+Documents and pasted text are processed exclusively in local memory. There are no accounts, cloud sync, analytics, or update pings. Only preferences, window bounds, recent paths (clearable from **File → Open Recent**), and per-file scroll offsets are saved locally. Inkglass never modifies your Markdown files.
 
 ## Development & Build
 
@@ -78,7 +80,7 @@ pnpm run dist:win
 ```
 
 - [`source/README.md`](source/README.md) — Source layout, security model, and verification
-- [`docs/releases/v2.1.0.md`](docs/releases/v2.1.0.md) — v2.1.0 release notes
+- [`docs/releases/v2.2.0.md`](docs/releases/v2.2.0.md) — v2.2.0 release notes
 - [`CONTRIBUTING.md`](CONTRIBUTING.md) — Contribution guidelines
 - [`LICENSE`](LICENSE) — MIT License
 

@@ -35,7 +35,7 @@ await build({
     sourcemap: false,
     cssCodeSplit: false,
     assetsInlineLimit: 10000000,
-    lib: {entry: path.join(root, "src/main.tsx"), name: "ModuReader", formats: ["iife"], fileName: "modu-reader"},
+    lib: {entry: path.join(root, "src/main.tsx"), name: "Inkglass", formats: ["iife"], fileName: "inkglass"},
     rolldownOptions: {output: {codeSplitting: false}},
   },
 });
@@ -45,8 +45,8 @@ if (jsFiles.length !== 1) throw new Error("Expected a single offline script.");
 const js = (await readFile(path.join(output, jsFiles[0]), "utf8")).replace(/[ \t]+$/gm, "");
 const css = (await Promise.all(names.filter(name => /\.css$/.test(name)).map(name => readFile(path.join(output, name), "utf8")))).join("\n").replace(/[ \t]+$/gm, "");
 const favicon = "data:image/svg+xml;base64," + Buffer.from(await readFile(path.join(root, "public/favicon.svg"))).toString("base64");
-const html = `<!doctype html>\n<html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="description" content="MoDu Reader · A local-first offline Markdown reader."><title>MoDu Reader · Offline Markdown Reader</title><link rel="icon" href="${favicon}"><style>${css.replace(/<\/style/gi, "<\\/style")}</style></head><body><div id="root"></div><noscript>Enable JavaScript to use MoDu Reader.</noscript><script>${js.replace(/<\/script/gi, "<\\/script")}</script></body></html>`;
-const destination = path.join(root, "dist/MoDu-Reader.html");
+const html = `<!doctype html>\n<html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="description" content="Inkglass · A local-first offline Markdown reader."><title>Inkglass · Offline Markdown Reader</title><link rel="icon" href="${favicon}"><style>${css.replace(/<\/style/gi, "<\\/style")}</style></head><body><div id="root"></div><noscript>Enable JavaScript to use Inkglass.</noscript><script>${js.replace(/<\/script/gi, "<\\/script")}</script></body></html>`;
+const destination = path.join(root, "dist/Inkglass.html");
 await writeFile(destination, html);
 
 // Preserve the licenses of packages actually included in this offline bundle.

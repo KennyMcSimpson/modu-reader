@@ -9,6 +9,7 @@ const {
   resolveLinkedDocument,
   listFolderDocuments,
   createFileWatcher,
+  migrateLegacyState,
   decodeText,
   externalUrl,
   fileArguments,
@@ -16,7 +17,7 @@ const {
 } = require('../files.cjs');
 
 test('real local files: Unicode paths, BOM, GB18030 and useful size/type errors', async t => {
-  const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'modu-files-'));
+  const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'inkglass-files-'));
   t.after(() => fs.rm(dir, { recursive: true, force: true }));
   const file = path.join(dir, '中文 笔记.md');
   await fs.writeFile(file, Buffer.concat([Buffer.from([255, 254]), Buffer.from('# 你好\r\n正文', 'utf16le')]));
@@ -34,7 +35,7 @@ test('real local files: Unicode paths, BOM, GB18030 and useful size/type errors'
 });
 
 test('image and linked-document references stay within authorized folder boundaries', async t => {
-  const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'modu-images-'));
+  const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'inkglass-images-'));
   t.after(() => fs.rm(dir, { recursive: true, force: true }));
   const docs = path.join(dir, 'docs');
   const sub = path.join(docs, 'nested');
@@ -80,7 +81,7 @@ test('image and linked-document references stay within authorized folder boundar
 });
 
 test('read-only folder walker respects bounds and skips ignored/hidden directories', async t => {
-  const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'modu-folder-'));
+  const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'inkglass-folder-'));
   t.after(() => fs.rm(dir, { recursive: true, force: true }));
   await fs.mkdir(path.join(dir, '.git'), { recursive: true });
   await fs.mkdir(path.join(dir, 'node_modules', 'pkg'), { recursive: true });
@@ -104,7 +105,7 @@ test('read-only folder walker respects bounds and skips ignored/hidden directori
 });
 
 test('file watcher detects live edits, deduplicates unchanged content, and closes cleanly', async t => {
-  const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'modu-watch-'));
+  const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'inkglass-watch-'));
   t.after(() => fs.rm(dir, { recursive: true, force: true }));
   const file = path.join(dir, 'plan.md');
   await fs.writeFile(file, '# Plan\n\nInitial version.\n');
@@ -139,9 +140,30 @@ test('file watcher detects live edits, deduplicates unchanged content, and close
   assert.equal(updates.length, 1);
 });
 
+test('migrateLegacyState non-destructively copies desktop-state.json without overwriting existing state', async t => {
+  const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'inkglass-migrate-'));
+  t.after(() => fs.rm(dir, { recursive: true, force: true }));
+  const legacyDir = path.join(dir, 'MoDu Reader');
+  const targetDir = path.join(dir, 'Inkglass');
+  await fs.mkdir(legacyDir, { recursive: true });
+  const legacyState = JSON.stringify({ recent: ['E:\\notes\\plan.md'], liveWatch: true, alwaysOnTop: false });
+  await fs.writeFile(path.join(legacyDir, 'desktop-state.json'), legacyState, 'utf8');
+
+  const first = await migrateLegacyState(legacyDir, targetDir);
+  assert.equal(first.migrated, true);
+  assert.equal(await fs.readFile(path.join(targetDir, 'desktop-state.json'), 'utf8'), legacyState);
+  assert.equal(await fs.readFile(path.join(legacyDir, 'desktop-state.json'), 'utf8'), legacyState);
+
+  const updatedState = JSON.stringify({ recent: ['E:\\notes\\new.md'], liveWatch: false, alwaysOnTop: true });
+  await fs.writeFile(path.join(targetDir, 'desktop-state.json'), updatedState, 'utf8');
+  const second = await migrateLegacyState(legacyDir, targetDir);
+  assert.equal(second.migrated, false);
+  assert.equal(await fs.readFile(path.join(targetDir, 'desktop-state.json'), 'utf8'), updatedState);
+});
+
 test('only explicit web/mail links can leave the reader', () => {
   for (const link of ['javascript:alert(1)', 'file:///C:/private.txt', 'powershell:run', 'ms-settings:privacy', '//example.com', 'data:text/html,hello']) assert.equal(externalUrl(link), null);
   assert.equal(externalUrl('https://example.com/docs'), 'https://example.com/docs');
   assert.equal(externalUrl('mailto:friend@example.com'), 'mailto:friend@example.com');
-  assert.deepEqual(fileArguments(['--flag', 'MoDu Reader.exe', '中文 笔记.md', 'other.png'], process.cwd()), [path.resolve('中文 笔记.md')]);
+  assert.deepEqual(fileArguments(['--flag', 'Inkglass.exe', '中文 笔记.md', 'other.png'], process.cwd()), [path.resolve('中文 笔记.md')]);
 });

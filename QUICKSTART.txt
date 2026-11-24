@@ -1,19 +1,26 @@
-MoDu Reader 2.1.0 — Quick Start (Windows x64)
-=============================================
+Inkglass 2.2.0 — Quick Start (Windows x64)
+==========================================
 
-Thank you for using MoDu Reader, an offline Windows Markdown reader built for
-living AI, research, and repository documentation.
+Thank you for using Inkglass (formerly MoDu Reader), an offline Windows
+Markdown reader built for living AI, research, and repository documentation.
+
+AUTOMATIC MIGRATION FROM MODU READER
+------------------------------------
+If you previously used MoDu Reader, Inkglass automatically copies your window
+bounds, recent files list, live-watch, and always-on-top state
+(desktop-state.json) from %APPDATA%\MoDu Reader on first launch. Your previous
+MoDu Reader folder is left untouched.
 
 HOW TO OPEN DOCUMENTS
 ---------------------
 1. Click "Open file" (Ctrl+O), drag Markdown files into the window, or pass a
    file on the command line.
 2. Click "Open folder" (Ctrl+Shift+O) to browse a repository folder in strict
-   read-only mode (MoDu never creates vault folders or edits your files).
+   read-only mode (Inkglass never creates vault folders or edits your files).
 3. Click "Paste text" (Ctrl+Shift+V) to inspect Markdown directly from the
    clipboard.
-4. With the installed version, select "MoDu Reader" under Windows "Open with"
-   to open .md files directly from File Explorer.
+4. With the installed version, select "Inkglass" under Windows "Open with" to
+   open .md files directly from File Explorer.
 
 LIVING DOCUMENT & TECHNICAL FEATURES
 ------------------------------------
@@ -31,9 +38,9 @@ LIVING DOCUMENT & TECHNICAL FEATURES
 PORTABLE ZIP NOTE
 -----------------
 If you downloaded the portable ZIP, extract the entire archive before launching
-"MoDu Reader.exe". Keep neighboring DLL/resource files beside the executable.
+"Inkglass.exe". Keep neighboring DLL/resource files beside the executable.
 
 PRIVACY
 -------
 All documents stay local in memory. No accounts, telemetry, or network uploads.
-Source code and release checksums: https://github.com/KennyMcSimpson/modu-reader
+Source code and release checksums: https://github.com/KennyMcSimpson/inkglass

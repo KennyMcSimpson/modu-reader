@@ -137,14 +137,14 @@ export type LocaleCopy = {
   };
 };
 
-export const localeStorageKey = "modu-locale";
+export const localeStorageKey = "inkglass-locale";
 
 export function getInitialLocale(): Locale {
   return "en";
 }
 
 const en: LocaleCopy = {
-  brand: { name: "MoDu", english: "MoDu Reader", descriptor: "Living Markdown Reader" },
+  brand: { name: "Inkglass", english: "Inkglass", descriptor: "Living Markdown Reader" },
   actions: {
     openFile: "Open file",
     openFolder: "Open folder",
@@ -178,8 +178,8 @@ const en: LocaleCopy = {
     emptyTitle: "Your documents will appear here",
     emptyHint: "Drop files or open a folder",
     localPrivacy: "Read-only · Zero repo pollution",
-    version: "MoDu 2.1",
-    sampleNames: { welcome: "Welcome to MoDu", guide: "Markdown quick reference" },
+    version: "Inkglass 2.2",
+    sampleNames: { welcome: "Welcome to Inkglass", guide: "Markdown quick reference" },
   },
   breadcrumb: { guide: "Reading guide", documents: "Documents" },
   tabs: { read: "Read", split: "Split", source: "Source", aria: "Document display mode" },
@@ -269,7 +269,7 @@ const en: LocaleCopy = {
   },
   aria: { fileInput: "Choose Markdown files or images", progress: "Reading progress", source: "Markdown source" },
   modelContext: {
-    title: "Read Markdown in MoDu Reader",
+    title: "Read Markdown in Inkglass",
     description: "Create and open a temporary Markdown document in the current window, just like Paste text. It is read-only and never touches disk.",
     inputError: "An object containing content is required.",
     argumentError: "content must be text; name is an optional name of up to 120 characters.",

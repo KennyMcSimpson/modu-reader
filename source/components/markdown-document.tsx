@@ -198,7 +198,7 @@ function MermaidDiagram({
     if (!el) return;
     const forceRender = () => setReady(true);
     window.addEventListener("beforeprint", forceRender);
-    window.addEventListener("modu-prepare-print", forceRender);
+    window.addEventListener("inkglass-prepare-print", forceRender);
     const observer = new IntersectionObserver(
       ([entry]) => {
         if (entry.isIntersecting) {
@@ -211,7 +211,7 @@ function MermaidDiagram({
     observer.observe(el);
     return () => {
       window.removeEventListener("beforeprint", forceRender);
-      window.removeEventListener("modu-prepare-print", forceRender);
+      window.removeEventListener("inkglass-prepare-print", forceRender);
       observer.disconnect();
     };
   }, []);
@@ -602,7 +602,7 @@ export const MarkdownDocument = memo(function MarkdownDocument({
               decoded = decodeURIComponent(url);
             } catch {}
             const name = decoded.split(/[\\/]/).pop()?.split(/[?#]/)[0] || "";
-            return assets[decoded] || assets[name] || (documentId && !/^(?:[a-z][a-z\d+.-]*:|[\\/])/i.test(decoded) ? `modu-media://${documentId}/${url}` : "");
+            return assets[decoded] || assets[name] || (documentId && !/^(?:[a-z][a-z\d+.-]*:|[\\/])/i.test(decoded) ? `inkglass-media://${documentId}/${url}` : "");
           }
           return defaultUrlTransform(url);
         }}

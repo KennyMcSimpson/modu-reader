@@ -193,7 +193,31 @@ function externalUrl(value) {
   try { const u = new URL(value); return ['https:', 'http:', 'mailto:'].includes(u.protocol) ? u.href : null; } catch { return null; }
 }
 
+async function migrateLegacyState(legacyDir, targetDir) {
+  if (!legacyDir || !targetDir) return { migrated: false };
+  const targetState = path.join(targetDir, 'desktop-state.json');
+  const legacyState = path.join(legacyDir, 'desktop-state.json');
+  try {
+    await fsp.access(targetState);
+    return { migrated: false };
+  } catch {}
+  try {
+    await fsp.access(legacyState);
+  } catch {
+    return { migrated: false };
+  }
+  await fsp.mkdir(targetDir, { recursive: true });
+  const tmpState = `${targetState}.migrate-${process.pid}.tmp`;
+  try {
+    await fsp.copyFile(legacyState, tmpState);
+    await fsp.rename(tmpState, targetState);
+  } finally {
+    await fsp.unlink(tmpState).catch(() => {});
+  }
+  return { migrated: true };
+}
+
 module.exports = {
   decodeText, readDocument, resolveImage, resolveLinkedDocument, listFolderDocuments,
-  createFileWatcher, fileArguments, externalUrl, isInside, TEXT_LIMIT, IMAGE_LIMIT,
+  createFileWatcher, migrateLegacyState, fileArguments, externalUrl, isInside, TEXT_LIMIT, IMAGE_LIMIT,
 };

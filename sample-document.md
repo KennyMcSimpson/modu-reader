@@ -1,18 +1,18 @@
 ---
-title: "MoDu Reader 2.1 Sample Document"
+title: "Inkglass 2.2 Sample Document"
 status: ready
 tags: [offline, markdown, windows, living-docs]
 ---
 
-# Welcome to MoDu Reader 2.1
+# Welcome to Inkglass 2.2
 
-This sample file demonstrates how MoDu Reader renders living technical and research documentation completely offline.
+This sample file demonstrates how Inkglass renders living technical and research documentation completely offline.
 
 > [!TIP]
-> Edit this file in any external editor while it is open in MoDu Reader — Live Diff-Watch will reload it automatically, keep your scroll position, and highlight which sections changed.
+> Edit this file in any external editor while it is open in Inkglass — Live Diff-Watch will reload it automatically, keep your scroll position, and highlight which sections changed.
 
 > [!NOTE]
-> MoDu Reader is strictly read-only. Opening a repository folder never creates hidden metadata files or alters your source Markdown.
+> Inkglass is strictly read-only. Opening a repository folder never creates hidden metadata files or alters your source Markdown.
 
 ## Technical Tables (Hover to Copy CSV / TSV)
 
@@ -35,7 +35,7 @@ $$
 
 ```mermaid
 graph LR
-  A[Local Repo / AI Agent] -->|Writes .md| B[MoDu Live Watch]
+  A[Local Repo / AI Agent] -->|Writes .md| B[Inkglass Live Watch]
   B --> C[Section Diff Highlights]
   B --> D[Preserved Scroll Position]
 ```

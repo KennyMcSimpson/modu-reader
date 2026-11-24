@@ -76,15 +76,19 @@ type LiveUpdateBanner = { docId: string; changedCount: number; changedHeadings: 
 
 const initial: Preferences = { theme: "light", size: 17, line: 1.95, width: "comfortable", font: "sans" };
 const samples: Doc[] = [
-  { id: "welcome", name: "Welcome to MoDu.md", content: welcome, sample: true },
+  { id: "welcome", name: "Welcome to Inkglass.md", content: welcome, sample: true },
   { id: "guide", name: "Markdown quick reference.md", content: formatGuide, sample: true },
 ];
 const accepted = ".md,.markdown,.mdown,.txt,.png,.jpg,.jpeg,.webp,.gif,.svg,.avif";
-const SCROLL_STORAGE_KEY = "modu-scroll-positions";
+const SCROLL_STORAGE_KEY = "inkglass-scroll-positions";
+const LEGACY_SCROLL_STORAGE_KEY = "modu-scroll-positions";
+const PREFS_STORAGE_KEY = "inkglass-preferences";
+const LEGACY_PREFS_STORAGE_KEY = "modu-preferences";
 
 function loadSavedScrolls(): Record<string, number> {
   try {
-    const raw = JSON.parse(localStorage.getItem(SCROLL_STORAGE_KEY) || "{}");
+    const rawText = localStorage.getItem(SCROLL_STORAGE_KEY) || localStorage.getItem(LEGACY_SCROLL_STORAGE_KEY) || "{}";
+    const raw = JSON.parse(rawText);
     return raw && typeof raw === "object" ? raw : {};
   } catch {
     return {};
@@ -194,7 +198,8 @@ function ReaderApp() {
 
   useEffect(() => {
     try {
-      const saved = JSON.parse(localStorage.getItem("modu-preferences") || "null");
+      const savedText = localStorage.getItem(PREFS_STORAGE_KEY) || localStorage.getItem(LEGACY_PREFS_STORAGE_KEY) || "null";
+      const saved = JSON.parse(savedText);
       if (saved) {
         setPreferences({
           theme: ["light", "dark", "system"].includes(saved.theme) ? saved.theme : initial.theme,
@@ -217,7 +222,7 @@ function ReaderApp() {
     document.documentElement.classList.toggle("dark", dark);
     document.documentElement.dataset.theme = dark ? "dark" : "light";
     if (loaded) {
-      try { localStorage.setItem("modu-preferences", JSON.stringify(preferences)); } catch {}
+      try { localStorage.setItem(PREFS_STORAGE_KEY, JSON.stringify(preferences)); } catch {}
     }
   }, [preferences, loaded, dark]);
 
@@ -375,7 +380,7 @@ function ReaderApp() {
     if (!desktop) return;
     try {
       // Force any off-screen lazy Mermaid diagrams to render before capturing PDF.
-      window.dispatchEvent(new Event("modu-prepare-print"));
+      window.dispatchEvent(new Event("inkglass-prepare-print"));
       for (let i = 0; i < 15; i++) {
         if (!document.querySelector(".diagram-loading")) break;
         await new Promise(resolve => setTimeout(resolve, 100));
