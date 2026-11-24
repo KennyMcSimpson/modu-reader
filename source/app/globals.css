@@ -146,18 +146,19 @@ button:focus-visible, a:focus-visible, summary:focus-visible { outline: 2px soli
 .mobile-close { display: none; margin-left: auto; }
 .reader-main { min-width: 0; flex: 1; height: 100dvh; overflow: hidden; }
 .reader-tabs { display: flex; flex-direction: column; height: 100%; gap: 0; }
-.topbar { flex-shrink: 0; height: 65px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; padding: 0 27px 0 22px; gap: 12px; }
-.file-breadcrumb { display: flex; align-items: center; min-width: 0; gap: 12px; font-size: 14px; }
+.topbar { flex-shrink: 0; height: 60px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; padding: 0 18px 0 16px; gap: 10px; }
+.file-breadcrumb { display: flex; align-items: center; flex: 1 1 auto; min-width: 0; overflow: hidden; gap: 6px; font-size: 14px; }
 .file-breadcrumb > svg { flex-shrink: 0; }
+.file-breadcrumb .icon-button, .reading-tools .icon-button { width: 30px; height: 30px; }
 .breadcrumb-divider { width: 1px; height: 16px; background: var(--border); flex-shrink: 0; margin-left: 0; margin-right: 2px; }
 .breadcrumb-parent { white-space: nowrap; color: var(--muted-foreground); }
 .breadcrumb-chevron { color: #a1adb5; }
 .current-filename { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--foreground); max-width: 320px; min-width: 0; }
-.reading-tools { display: flex; align-items: center; gap: 7px; flex-shrink: 0; min-width: 0; }
+.reading-tools { display: flex; align-items: center; gap: 3px; flex-shrink: 0; min-width: 0; }
 .view-tabs { height: 31px !important; padding: 2px; background: var(--muted); border-radius: 6px; }
-.view-tabs > button { gap: 6px; padding: 3px 10px; font-size: 14px; border-radius: 4px; }
+.view-tabs > button { gap: 5px; padding: 3px 8px; font-size: 13px; border-radius: 4px; }
 .view-tabs > button svg { width: 13px; height: 13px; }
-.tools-divider { width: 1px; height: 18px; background: var(--border); margin: 0 7px; }
+.tools-divider { width: 1px; height: 18px; background: var(--border); margin: 0 3px; }
 .type-trigger { font-family: Georgia, serif; font-size: 21px; letter-spacing: -1px; color: var(--foreground); }
 .content-layout { display: flex; flex: 1; min-height: 0; min-width: 0; }
 .document-scroll { flex: 1; min-width: 0; min-height: 0; overflow-y: auto; overflow-x: hidden; scrollbar-width: thin; scrollbar-color: #b4bec550 transparent; }
@@ -297,6 +298,11 @@ button:focus-visible, a:focus-visible, summary:focus-visible { outline: 2px soli
   .mobile-toc { display: flex; }
   .document-inner { width: calc(100% - 86px); }
   .breadcrumb-parent, .breadcrumb-chevron { display: none; }
+  .file-breadcrumb { gap: 4px; }
+  .file-breadcrumb .icon-button, .reading-tools .icon-button { width: 28px; height: 28px; }
+  .reading-tools { gap: 2px; }
+  .view-tabs > button { padding: 3px 7px; font-size: 12px; }
+  .view-tabs > button svg { display: none; }
 }
 @media (max-width: 767px) {
   .mobile-close { display: inline-flex; }

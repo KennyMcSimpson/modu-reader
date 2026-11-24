@@ -88,9 +88,15 @@ try {
   await page.waitForFunction(() => /1\s*\/\s*2/.test(document.querySelector('.find-count')?.textContent || ''));
   await page.locator('.desktop-find input').press('Escape');
 
-  // Verify relative Markdown link traversal and exact Back navigation.
+  // Verify relative Markdown link traversal and exact Back navigation (ensuring topbar tools never overlap Back).
   await page.getByRole('link', { name: 'linked doc' }).click();
   await page.getByRole('heading', { name: 'Linked Document', exact: true }).waitFor();
+  const topbarClear = await page.evaluate(() => {
+    const back = document.querySelector('button[aria-label="Back (Alt+Left)"]')?.getBoundingClientRect();
+    const tools = document.querySelector('.reading-tools')?.getBoundingClientRect();
+    return { backRight: back?.right ?? 0, toolsLeft: tools?.left ?? 0 };
+  });
+  assert.ok(topbarClear.backRight <= topbarClear.toolsLeft, `Topbar reading-tools overlapped Back button: ${JSON.stringify(topbarClear)}`);
   await page.getByRole('button', { name: 'Back (Alt+Left)', exact: true }).click();
   await page.getByRole('heading', { name: 'Desktop smoke test', exact: true }).waitFor();
 
