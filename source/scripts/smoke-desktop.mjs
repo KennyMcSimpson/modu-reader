@@ -64,7 +64,7 @@ try {
   await page.locator('.table-shell').first().hover();
   await page.getByRole('button', { name: 'Copy table as CSV', exact: true }).click();
   await page.getByText('Copied table as CSV', { exact: true }).waitFor({ timeout: 5000 });
-  const copiedCsv = await app.evaluate(({ clipboard }) => clipboard.readText());
+  const copiedCsv = (await app.evaluate(({ clipboard }) => clipboard.readText())).replace(/\r\n/g, '\n');
   assert.equal(copiedCsv, 'Metric,Value\n$R^2$,0.99', `Unexpected CSV export: ${copiedCsv}`);
 
   await page.locator('.diagram-block').first().scrollIntoViewIfNeeded().catch(() => {});
