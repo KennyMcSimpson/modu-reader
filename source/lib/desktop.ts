@@ -23,12 +23,20 @@ export type FolderListing = {
   truncated: boolean;
 };
 
+export type RecentEntry = {
+  path: string;
+  name: string;
+  dir: string;
+};
+
 export type NativeAction =
   | "paste"
   | "reload"
   | "close"
   | "focus"
   | "find"
+  | "quick-jump"
+  | "copy-citation"
   | "open-folder"
   | "export-pdf"
   | "watch-on"
@@ -42,8 +50,12 @@ export interface DesktopBridge {
   platform: string;
   openFiles(): Promise<void>;
   openFolder(): Promise<FolderListing | null>;
+  refreshFolder(): Promise<FolderListing | null>;
+  closeFolder(): Promise<{ ok: boolean }>;
   openFolderFile(targetPath: string): Promise<void>;
   openLinked(sourceId: string, href: string): Promise<{ ok: boolean; fragment: string }>;
+  getRecent(): Promise<RecentEntry[]>;
+  openRecent(targetPath: string): Promise<void>;
   closeFile(id: string): Promise<void>;
   ready(): Promise<{ version: string; liveWatch: boolean; alwaysOnTop: boolean }>;
   reloadFile(id: string): Promise<void>;

@@ -1,6 +1,7 @@
 "use client";
 
 import { copyText } from "@/lib/clipboard";
+import { extractCleanText } from "@/lib/clean-text";
 import { extractFrontmatter } from "@/lib/frontmatter";
 import { parseGitHubAlert, type AlertKind } from "@/lib/alerts";
 import { serializeTable } from "@/lib/table-export";
@@ -35,6 +36,45 @@ function textOf(value: React.ReactNode): string {
   if (Array.isArray(value)) return value.map(textOf).join("");
   if (React.isValidElement<{ children?: React.ReactNode }>(value)) return textOf(value.props.children);
   return "";
+}
+
+function plainTextOf(value: React.ReactNode): string {
+  if (typeof value === "string" || typeof value === "number") return String(value);
+  if (Array.isArray(value)) return value.map(plainTextOf).join("");
+  if (React.isValidElement<{ className?: string; children?: React.ReactNode }>(value)) {
+    const cls = typeof value.props.className === "string" ? value.props.className : "";
+    if (/\bkatex-mathml\b|\bkatex-copy-tex\b/.test(cls)) return "";
+    return plainTextOf(value.props.children);
+  }
+  return "";
+}
+
+type HastNode = {
+  type?: string;
+  tagName?: string;
+  properties?: Record<string, unknown>;
+  children?: HastNode[];
+};
+
+// Tags top-level Markdown headings with deterministic 0-based indices so duplicate heading titles
+// (e.g. two "### Notes" sections) can be disambiguated accurately during Live Diff-Watch.
+function rehypeHeadingIndex() {
+  return (tree: unknown) => {
+    let idx = 0;
+    const walk = (node: HastNode, insideNested: boolean) => {
+      if (!node || typeof node !== "object") return;
+      const isNested =
+        insideNested || (node.type === "element" && (node.tagName === "blockquote" || node.tagName === "li"));
+      if (!isNested && node.type === "element" && typeof node.tagName === "string" && /^h[1-6]$/.test(node.tagName)) {
+        if (!node.properties) node.properties = {};
+        node.properties["data-heading-index"] = idx++;
+      }
+      if (Array.isArray(node.children)) {
+        for (const child of node.children) walk(child, isNested);
+      }
+    };
+    walk(tree as HastNode, false);
+  };
 }
 
 type LightboxItem =
@@ -413,7 +453,7 @@ function SmartTable({ children, labels }: { children?: React.ReactNode; labels: 
     const table = wrapRef.current?.querySelector("table");
     if (!table) return;
     const rows = [...table.querySelectorAll("tr")].map(tr =>
-      [...tr.querySelectorAll("th,td")].map(cell => (cell.textContent || "").trim()),
+      [...tr.querySelectorAll("th,td")].map(cell => extractCleanText(cell, "markdown").trim()),
     );
     if (!rows.length) return;
     try {
@@ -448,6 +488,8 @@ export const MarkdownDocument = memo(function MarkdownDocument({
   locale,
   documentId,
   changedHeadings = [],
+  changedSectionIndices = [],
+  mediaVersion = 0,
 }: {
   documentId?: string;
   content: string;
@@ -456,6 +498,8 @@ export const MarkdownDocument = memo(function MarkdownDocument({
   onLink: (href: string) => void;
   locale: Locale;
   changedHeadings?: string[];
+  changedSectionIndices?: number[];
+  mediaVersion?: number;
 }) {
   const labels = copies[locale].renderer;
   const [lightbox, setLightbox] = useState<LightboxItem | null>(null);
@@ -463,6 +507,7 @@ export const MarkdownDocument = memo(function MarkdownDocument({
 
   const { metadata, body } = useMemo(() => extractFrontmatter(content), [content]);
   const changedSet = useMemo(() => new Set(changedHeadings.map(h => h.trim())), [changedHeadings]);
+  const changedIndexSet = useMemo(() => new Set(changedSectionIndices), [changedSectionIndices]);
 
   const handleCopySvg = useCallback(async (svg: string) => {
     try {
@@ -473,7 +518,8 @@ export const MarkdownDocument = memo(function MarkdownDocument({
     }
   }, [labels.copyFailed, locale]);
 
-  // Attach unobtrusive 1-click raw LaTeX copy buttons to rendered KaTeX display formulas.
+  // Attach unobtrusive 1-click raw LaTeX copy buttons to rendered KaTeX display formulas,
+  // and Alt+Click raw LaTeX copy to inline KaTeX expressions.
   useEffect(() => {
     const container = rootRef.current;
     if (!container) return;
@@ -507,14 +553,55 @@ export const MarkdownDocument = memo(function MarkdownDocument({
         btn.remove();
       });
     });
+
+    const inlines = container.querySelectorAll<HTMLElement>(".katex");
+    inlines.forEach(el => {
+      if (el.closest(".katex-display")) return;
+      const annotation = el.querySelector('annotation[encoding="application/x-tex"]');
+      const tex = annotation?.textContent?.trim();
+      if (!tex) return;
+      const prevTitle = el.getAttribute("title");
+      el.title = "Alt+Click to copy raw LaTeX";
+      el.classList.add("katex-inline-copy");
+      const onInlineClick = async (e: MouseEvent) => {
+        if (!e.altKey) return;
+        e.preventDefault();
+        e.stopPropagation();
+        try {
+          await copyText(tex);
+          toast.success(copies[locale].success.texCopied);
+        } catch {
+          toast.error(labels.copyFailed);
+        }
+      };
+      el.addEventListener("click", onInlineClick);
+      cleanups.push(() => {
+        el.removeEventListener("click", onInlineClick);
+        el.classList.remove("katex-inline-copy");
+        if (prevTitle === null) el.removeAttribute("title");
+        else el.setAttribute("title", prevTitle);
+      });
+    });
+
     return () => cleanups.forEach(fn => fn());
   }, [body, labels.copyFailed, labels.copyTex, locale]);
 
   const makeHeading = useCallback(
     (Tag: "h1" | "h2" | "h3" | "h4" | "h5" | "h6") =>
-      function Heading({ children, id, node: _node, className, ...props }: React.HTMLAttributes<HTMLHeadingElement> & { node?: unknown }) {
-        const title = textOf(children).replace(/\s+/g, " ").trim();
-        const isChanged = changedSet.size > 0 && changedSet.has(title);
+      function Heading({
+        children,
+        id,
+        node: _node,
+        className,
+        ...props
+      }: React.HTMLAttributes<HTMLHeadingElement> & { node?: unknown; "data-heading-index"?: number | string }) {
+        const rawIdx = props["data-heading-index"];
+        const headingIdx = rawIdx !== undefined ? Number(rawIdx) : NaN;
+        const title = plainTextOf(children).replace(/\s+/g, " ").trim();
+        const isChanged =
+          changedIndexSet.size > 0
+            ? Number.isInteger(headingIdx) && changedIndexSet.has(headingIdx)
+            : changedSet.size > 0 && changedSet.has(title);
         const mergedClass = [className, isChanged ? "section-changed" : ""].filter(Boolean).join(" ") || undefined;
         return (
           <Tag id={id} data-changed={isChanged ? "true" : undefined} className={mergedClass} {...props}>
@@ -522,7 +609,7 @@ export const MarkdownDocument = memo(function MarkdownDocument({
           </Tag>
         );
       },
-    [changedSet],
+    [changedIndexSet, changedSet],
   );
 
   const components = useMemo(
@@ -542,11 +629,13 @@ export const MarkdownDocument = memo(function MarkdownDocument({
       img: ({ src, alt, title }: { src?: string | Blob; alt?: string; title?: string }) => (
         <DocumentImage src={typeof src === "string" ? src : undefined} alt={alt} title={title} labels={labels} onInspect={setLightbox} />
       ),
-      a: ({ href, children }: { href?: string; children?: React.ReactNode }) => {
+      a: ({ href, title, children }: { href?: string; title?: string; children?: React.ReactNode }) => {
         const external = /^https?:|^mailto:/i.test(href || "");
         return (
           <a
             href={href}
+            title={title || href}
+            className={external ? "external-link" : undefined}
             target={external ? "_blank" : undefined}
             rel={external ? "noopener noreferrer" : undefined}
             onClick={
@@ -593,6 +682,7 @@ export const MarkdownDocument = memo(function MarkdownDocument({
           [rehypeKatex, { throwOnError: false, trust: false }],
           [rehypeHighlight, { ignoreMissing: true, detect: false }],
           [rehypeSlug, { prefix: "md-" }],
+          rehypeHeadingIndex,
         ]}
         components={components}
         urlTransform={(url, key) => {
@@ -602,7 +692,13 @@ export const MarkdownDocument = memo(function MarkdownDocument({
               decoded = decodeURIComponent(url);
             } catch {}
             const name = decoded.split(/[\\/]/).pop()?.split(/[?#]/)[0] || "";
-            return assets[decoded] || assets[name] || (documentId && !/^(?:[a-z][a-z\d+.-]*:|[\\/])/i.test(decoded) ? `inkglass-media://${documentId}/${url}` : "");
+            return (
+              assets[decoded] ||
+              assets[name] ||
+              (documentId && !/^(?:[a-z][a-z\d+.-]*:|[\\/])/i.test(decoded)
+                ? `inkglass-media://${documentId}/asset?ref=${encodeURIComponent(url)}${mediaVersion ? `&v=${mediaVersion}` : ""}`
+                : "")
+            );
           }
           return defaultUrlTransform(url);
         }}

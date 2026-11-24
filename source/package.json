@@ -1,17 +1,17 @@
 {
   "name": "inkglass",
-  "version": "2.2.0",
+  "version": "2.3.0",
   "private": false,
   "description": "Offline Windows Markdown reader for living AI, research, and repository docs — with live diff-watch, interactive Mermaid/KaTeX/table tools, and read-only folder navigation.",
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/KennyMcSimpson/inkglass.git"
+    "url": "git+https://github.com/KennyMcSimpson/Inkglass.git"
   },
   "bugs": {
-    "url": "https://github.com/KennyMcSimpson/inkglass/issues"
+    "url": "https://github.com/KennyMcSimpson/Inkglass/issues"
   },
-  "homepage": "https://github.com/KennyMcSimpson/inkglass",
+  "homepage": "https://github.com/KennyMcSimpson/Inkglass",
   "keywords": [
     "markdown",
     "reader",

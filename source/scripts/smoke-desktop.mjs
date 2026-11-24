@@ -9,13 +9,16 @@ const fixture = await mkdtemp(path.join(os.tmpdir(), 'inkglass-smoke-'));
 const results = path.resolve('test-results');
 await mkdir(results, { recursive: true });
 await mkdir(path.join(fixture, 'images'));
+await mkdir(path.join(fixture, 'docs'));
 await writeFile(path.join(fixture, 'images', 'local image.png'), Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAwAAAAMCAIAAADZF8uwAAAAF0lEQVR4nGN82ejPQAgwEVQxqmgAFAEAEL0B0TGFd2QAAAAASUVORK5CYII=', 'base64'));
 const linkedFile = path.join(fixture, 'linked.md');
 await writeFile(linkedFile, '# Linked Document\n\n## Details\n\nReached via relative Markdown link.\n');
+const subDocFile = path.join(fixture, 'docs', 'sub.md');
+await writeFile(subDocFile, '# Nested Subdoc\n\n![cross-subdir image](../images/local%20image.png)\n');
 const filename = path.join(fixture, '中文 file.md');
 await writeFile(
   filename,
-  '---\ntitle: Desktop Smoke\nstatus: verified\ntags: [offline, windows]\n---\n\n# Desktop smoke test\n\nOffline reading check. SearchNeedle is here. SearchNeedle is here again.\n\n> [!TIP]\n> GitHub Alerts render natively without external plugins.\n\nSee [linked doc](./linked.md#details) for details.\n\n![local image](images/local%20image.png)\n\n## Features\n\n| A | B |\n|---|---|\n| one | two |\n\nInline $E=mc^2$.\n\n$$\n\\frac{1}{2} + \\sqrt{x}\n$$\n\n```js\nconst local = true;\n```\n\n```mermaid\ngraph TD\n  A[Local file] --> B[Desktop reader]\n```\n\n<script>window.__inkglassUntrustedMarkdownExecuted=true</script>\n',
+  '---\ntitle: Desktop Smoke\nstatus: verified\ntags: [offline, windows]\n---\n\n# Desktop smoke test\n\nOffline reading check. SearchNeedle is here. SearchNeedle is here again.\n\n> [!TIP]\n> GitHub Alerts render natively without external plugins.\n\nSee [linked doc](./linked.md#details) for details.\n\n![local image](images/local%20image.png)\n\n## Loss $L_2$\n\n| Metric | Value |\n|---|---|\n| $R^2$ | 0.99 |\n\nInline $E=mc^2$.\n\n$$\n\\frac{1}{2} + \\sqrt{x}\n$$\n\n```js\nconst local = true;\n```\n\n```mermaid\ngraph TD\n  A[Local file] --> B[Desktop reader]\n```\n\n<script>window.__inkglassUntrustedMarkdownExecuted=true</script>\n',
 );
 const expectedPackage = JSON.parse(await readFile(new URL('../package.json', import.meta.url), 'utf8'));
 const executable = process.env.INKGLASS_EXECUTABLE || process.env.MODU_EXECUTABLE;
@@ -45,12 +48,25 @@ try {
 
   await page.waitForFunction(() => { const image = document.querySelector('article img'); return image?.complete && image.naturalWidth > 0; });
   assert.equal(await page.locator('article table').count(), 1);
-  assert.equal(await page.locator('article .katex').count(), 2);
+  assert.equal(await page.locator('article .katex').count(), 4);
   assert.equal(await page.locator('article .katex-display').count(), 1);
   assert.equal(await page.locator('article .katex-error').count(), 0);
-  assert.equal(await page.locator('article .katex-mathml').count(), 2);
+  assert.equal(await page.locator('article .katex-mathml').count(), 4);
   await page.evaluate(() => document.fonts.ready);
   assert.equal(await page.locator('article .katex-html').first().evaluate(el => getComputedStyle(el).fontFamily.includes('KaTeX')), true);
+
+  // Verify TOC heading with inline KaTeX has clean plain text (no duplicated TeX annotation).
+  const mathTocText = (await page.locator('.toc-sidebar .toc-link').filter({ hasText: 'Loss' }).first().textContent())?.trim() || '';
+  assert.match(mathTocText, /^Loss /);
+  assert.equal(mathTocText.includes('L_2'), false, `TOC heading must not leak raw KaTeX annotation: ${mathTocText}`);
+
+  // Verify KaTeX-in-table CSV export extracts clean $R^2$ instead of garbled MathML+HTML text.
+  await page.locator('.table-shell').first().hover();
+  await page.getByRole('button', { name: 'Copy table as CSV', exact: true }).click();
+  await page.getByText('Copied table as CSV', { exact: true }).waitFor({ timeout: 5000 });
+  const copiedCsv = await app.evaluate(({ clipboard }) => clipboard.readText());
+  assert.equal(copiedCsv, 'Metric,Value\n$R^2$,0.99', `Unexpected CSV export: ${copiedCsv}`);
+
   await page.locator('.diagram-block').first().scrollIntoViewIfNeeded().catch(() => {});
   await page.locator('article .diagram-svg svg').first().waitFor({ timeout: 30000 });
   assert.match((await page.locator('.diagram-svg').textContent()) || '', /Local file/);
@@ -78,13 +94,42 @@ try {
   await page.getByRole('button', { name: 'Back (Alt+Left)', exact: true }).click();
   await page.getByRole('heading', { name: 'Desktop smoke test', exact: true }).waitFor();
 
-  // Verify Read-Only Folder drawer opens bounded local folder listing.
+  // Verify Read-Only Folder drawer opens bounded local folder listing and resolves cross-subdirectory images.
   await app.evaluate(({ dialog }, dir) => { dialog.showOpenDialog = async () => ({ canceled: false, filePaths: [dir] }); }, fixture);
   await page.getByRole('button', { name: 'Open folder', exact: true }).click();
+  await page.locator('.folder-file-item').filter({ hasText: 'docs/sub.md' }).click();
+  await page.getByRole('heading', { name: 'Nested Subdoc', exact: true }).waitFor();
+  await page.waitForFunction(() => { const image = document.querySelector('article img[alt="cross-subdir image"]'); return image?.complete && image.naturalWidth > 0; });
   await page.locator('.folder-file-item').filter({ hasText: 'linked.md' }).click();
   await page.getByRole('heading', { name: 'Linked Document', exact: true }).waitFor();
   await page.getByRole('button', { name: 'Back (Alt+Left)', exact: true }).click();
+  await page.getByRole('heading', { name: 'Nested Subdoc', exact: true }).waitFor();
+  await page.getByRole('button', { name: 'Back (Alt+Left)', exact: true }).click();
   await page.getByRole('heading', { name: 'Desktop smoke test', exact: true }).waitFor();
+
+  // Verify Ctrl+K Quick Jump palette filters and navigates cleanly.
+  await app.evaluate(({ Menu }) => Menu.getApplicationMenu().getMenuItemById('quick-jump').click());
+  await page.locator('.quick-jump-input').waitFor();
+  await page.locator('.quick-jump-input').fill('linked.md');
+  await page.locator('.quick-jump-item').filter({ hasText: 'linked.md' }).first().waitFor();
+  await page.locator('.quick-jump-input').press('Enter');
+  await page.locator('.quick-jump-input').waitFor({ state: 'detached' });
+  await page.getByRole('heading', { name: 'Linked Document', exact: true }).waitFor();
+  await page.getByRole('button', { name: 'Back (Alt+Left)', exact: true }).click();
+  await page.getByRole('heading', { name: 'Desktop smoke test', exact: true }).waitFor();
+
+  // Verify Dark-mode print media stylesheet forces crisp light paper colors.
+  await page.getByRole('button', { name: 'Dark', exact: true }).click();
+  await page.waitForFunction(() => document.documentElement.classList.contains('dark'));
+  await page.emulateMedia({ media: 'print' });
+  const printColors = await page.evaluate(() => ({
+    bg: getComputedStyle(document.body).backgroundColor,
+    fg: getComputedStyle(document.body).color,
+  }));
+  assert.equal(printColors.bg, 'rgb(255, 255, 255)', `Dark mode print background must be white, got ${printColors.bg}`);
+  assert.equal(printColors.fg, 'rgb(27, 34, 40)', `Dark mode print text must be dark ink, got ${printColors.fg}`);
+  await page.emulateMedia({ media: 'screen' });
+  await page.getByRole('button', { name: 'Light', exact: true }).click();
 
   // Verify Always on Top native toggle reports topmost state on Windows.
   await app.evaluate(({ Menu }) => Menu.getApplicationMenu().getMenuItemById('always-on-top').click());
@@ -104,11 +149,15 @@ try {
   assert.ok(pdfBuf, 'Export PDF did not create output file in time');
   assert.equal(pdfBuf.subarray(0, 5).toString('ascii'), '%PDF-', 'Export PDF must write a valid PDF header');
 
-  // Verify Live Diff-Watch automatically reloads external disk changes without pressing F5.
+  // Verify Live Diff-Watch automatically reloads external disk changes and opens line-level diff drawer.
   await writeFile(filename, '# Desktop smoke test\n\n## `Live` Section\n\nUpdated automatically on disk.\n');
   await page.getByRole('heading', { name: 'Live Section', exact: true }).waitFor({ timeout: 10000 });
   await page.locator('.live-diff-bar').waitFor({ timeout: 10000 });
   assert.equal(await page.locator('article h2[data-changed="true"]').count(), 1);
+  await page.getByRole('button', { name: /Show diff/ }).click();
+  await page.locator('.live-diff-drawer').waitFor();
+  assert.ok((await page.locator('.live-diff-drawer .diff-line-add').count()) > 0);
+  assert.ok((await page.locator('.live-diff-drawer .diff-line-del').count()) > 0);
 
   // Verify manual F5 reload still works cleanly.
   await writeFile(filename, '# Updated on disk\n\nReloaded with F5.');
@@ -150,9 +199,9 @@ try {
     executable: executable || 'development',
     checks: [
       'real-executable', 'version-match', 'command-line-open', 'native-dialog',
-      'frontmatter', 'github-alerts', 'relative-image', 'table', 'math', 'mermaid',
-      'split-view', 'find', 'relative-md-link', 'folder-drawer', 'always-on-top',
-      'export-pdf', 'live-diff-watch', 'reload',
+      'frontmatter', 'github-alerts', 'relative-image', 'cross-subdir-image', 'table', 'katex-csv-clean', 'math', 'katex-toc-clean', 'mermaid',
+      'split-view', 'find', 'quick-jump', 'dark-mode-print', 'relative-md-link', 'folder-drawer', 'always-on-top',
+      'export-pdf', 'live-diff-watch', 'live-diff-drawer', 'reload',
       'paste', 'second-instance', 'sandbox', 'offline',
     ],
     errors,

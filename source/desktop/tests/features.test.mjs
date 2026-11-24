@@ -2,9 +2,21 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { extractFrontmatter } from '../../lib/frontmatter.ts';
 import { parseGitHubAlert } from '../../lib/alerts.ts';
-import { splitMarkdownSections, diffDocumentSections, normalizeHeadingText } from '../../lib/live-diff.ts';
+import {
+  splitMarkdownSections,
+  diffDocumentSections,
+  computeLineDiff,
+  extractHeadingLines,
+  normalizeHeadingText,
+} from '../../lib/live-diff.ts';
 import { serializeTable } from '../../lib/table-export.ts';
 import { formatMarkdownCitation } from '../../lib/citations.ts';
+import {
+  extractCleanText,
+  formatKatexMarkdown,
+  disambiguateDocLabels,
+  formatRelativeToRoot,
+} from '../../lib/clean-text.ts';
 
 test('extractFrontmatter parses key/value, arrays, zero-indent lists, trailing spaces and ignores invalid blocks', () => {
   const doc = [
@@ -141,4 +153,292 @@ test('formatMarkdownCitation formats single/multi-line quotes with optional head
     '> Solo quote\n>\n> — notes.md',
   );
   assert.equal(formatMarkdownCitation('   ', 'notes.md'), '');
+});
+
+test('diffDocumentSections disambiguates duplicate heading titles via changedSectionIndices', () => {
+  const before = [
+    'Leading intro line before headings.',
+    '',
+    '# Report',
+    'Summary.',
+    '',
+    '### Notes',
+    'First notes block.',
+    '',
+    '### Notes',
+    'Second notes block.',
+  ].join('\n');
+
+  // Only the second "### Notes" (headingIndex 2) changes.
+  const afterSecond = before.replace('Second notes block.', 'Second notes block updated.');
+  const diffSecond = diffDocumentSections(before, afterSecond);
+  assert.equal(diffSecond.changedCount, 1);
+  assert.deepEqual(diffSecond.changedHeadings, ['Notes']);
+  assert.deepEqual(diffSecond.changedSectionIndices, [2]);
+
+  // Only the first "### Notes" (headingIndex 1) changes.
+  const afterFirst = before.replace('First notes block.', 'First notes block updated.');
+  const diffFirst = diffDocumentSections(before, afterFirst);
+  assert.equal(diffFirst.changedCount, 1);
+  assert.deepEqual(diffFirst.changedSectionIndices, [1]);
+});
+
+test('computeLineDiff counts added/removed lines, detects EOF appends, and caps huge inputs gracefully', () => {
+  const same = computeLineDiff('a\nb\n', 'a\nb\n');
+  assert.equal(same.addedLines, 0);
+  assert.equal(same.removedLines, 0);
+  assert.deepEqual(same.hunks, []);
+  assert.equal(same.truncated, false);
+
+  const edited = computeLineDiff('# Title\nold line\nkeep\n', '# Title\nnew line 1\nnew line 2\nkeep\n');
+  assert.equal(edited.removedLines, 1);
+  assert.equal(edited.addedLines, 2);
+  assert.equal(edited.truncated, false);
+  assert.ok(edited.hunks.some(h => h.kind === 'del' && h.text === 'old line'));
+  assert.ok(edited.hunks.some(h => h.kind === 'add' && h.text === 'new line 1'));
+
+  const appended = computeLineDiff('# Log\nentry 1', '# Log\nentry 1\nentry 2\nentry 3');
+  assert.equal(appended.addedLines, 2);
+  assert.equal(appended.removedLines, 0);
+  assert.equal(appended.appendedAtEof, true);
+
+  // Real files saved with a trailing newline must still detect EOF appends.
+  const appendedTrailingNl = computeLineDiff('# Log\nentry 1\n', '# Log\nentry 1\nentry 2\n');
+  assert.equal(appendedTrailingNl.addedLines, 1);
+  assert.equal(appendedTrailingNl.removedLines, 0);
+  assert.equal(appendedTrailingNl.appendedAtEof, true);
+
+  // Mid-file insertion must NOT be misclassified as an EOF append.
+  const midInsert = computeLineDiff('# Log\nentry 1\nentry 3\n', '# Log\nentry 1\nentry 2\nentry 3\n');
+  assert.equal(midInsert.appendedAtEof, false);
+
+  // Large-file cap returns bounded hunks without quadratic blowup.
+  const bigA = Array.from({ length: 800 }, (_, i) => `old-${i}`).join('\n');
+  const bigB = Array.from({ length: 800 }, (_, i) => `new-${i}`).join('\n');
+  const bigDiff = computeLineDiff(bigA, bigB, 400);
+  assert.equal(bigDiff.truncated, true);
+  assert.equal(bigDiff.removedLines, 800);
+  assert.equal(bigDiff.addedLines, 800);
+  assert.ok(bigDiff.hunks.length <= 200);
+});
+
+test('extractHeadingLines and splitMarkdownSections support indented ATX, C#, and Setext headings without horizontal-rule false positives', () => {
+  const md = [
+    '---',
+    '# frontmatter comment',
+    'title: Sync',
+    '---',
+    'Main Title',
+    '==========',
+    '   ## Indented ATX ##',
+    '```bash',
+    '# commented code',
+    '```',
+    '## C#',
+    '',
+    '---',
+    '',
+    'Setext Sub',
+    '----------',
+    '> # Quoted heading ignored',
+    '- # List heading ignored',
+    '    # 4-space code heading ignored',
+  ].join('\n');
+  const info = extractHeadingLines(md);
+  assert.equal(info.totalLines, 19);
+  assert.deepEqual(
+    info.headings.map(h => ({ index: h.index, level: h.level, title: h.title, line: h.line })),
+    [
+      { index: 0, level: 1, title: 'Main Title', line: 4 },
+      { index: 1, level: 2, title: 'Indented ATX', line: 6 },
+      { index: 2, level: 2, title: 'C#', line: 10 },
+      { index: 3, level: 2, title: 'Setext Sub', line: 14 },
+    ],
+  );
+  const sections = splitMarkdownSections(md);
+  assert.deepEqual(
+    sections.map(s => ({ headingIndex: s.headingIndex, heading: s.heading })),
+    [
+      { headingIndex: 0, heading: 'Main Title' },
+      { headingIndex: 1, heading: 'Indented ATX' },
+      { headingIndex: 2, heading: 'C#' },
+      { headingIndex: 3, heading: 'Setext Sub' },
+    ],
+  );
+});
+
+test('clean-text helpers format KaTeX markdown, disambiguate duplicate filenames, and compute relative paths', () => {
+  assert.equal(formatKatexMarkdown(' R^2 ', false), '$R^2$');
+  assert.equal(formatKatexMarkdown('\\frac{1}{2}', true), '$$\\frac{1}{2}$$');
+  assert.equal(formatKatexMarkdown('   ', false), '');
+
+  const labels = disambiguateDocLabels([
+    { id: '1', name: 'README.md', path: 'E:\\repo\\docs\\README.md' },
+    { id: '2', name: 'README.md', path: 'E:\\repo\\api\\README.md' },
+    { id: '3', name: 'CHANGELOG.md', path: 'E:\\repo\\CHANGELOG.md' },
+    { id: '4', name: 'notes.md', path: 'E:\\repo\\a\\shared\\notes.md' },
+    { id: '5', name: 'notes.md', path: 'E:\\repo\\b\\shared\\notes.md' },
+  ]);
+  assert.deepEqual(labels, {
+    '1': 'docs/README.md',
+    '2': 'api/README.md',
+    '3': 'CHANGELOG.md',
+    '4': 'a/shared/notes.md',
+    '5': 'b/shared/notes.md',
+  });
+
+  assert.equal(formatRelativeToRoot('E:\\Repo\\docs\\sub.md', 'e:\\repo'), 'docs/sub.md');
+  assert.equal(formatRelativeToRoot('E:\\Other\\file.md', 'E:\\Repo'), null);
+});
+
+test('extractCleanText extracts clean KaTeX markdown or plain text without MathML duplication', () => {
+  // Minimal DOM node stub to verify extractCleanText logic in Node 24 without external DOM libraries.
+  class MiniNode {
+    constructor(nodeType, tagName = '', classes = [], attrs = {}, text = '') {
+      this.nodeType = nodeType;
+      this.tagName = tagName;
+      this.classes = new Set(classes);
+      this.attrs = { ...attrs };
+      this._text = text;
+      this.children = [];
+      this.parent = null;
+      this.ownerDocument = miniDoc;
+    }
+    appendChild(child) {
+      if (child.nodeType === 11) {
+        for (const c of [...child.children]) this.appendChild(c);
+        return child;
+      }
+      child.parent = this;
+      this.children.push(child);
+      return child;
+    }
+    cloneNode() {
+      const c = new MiniNode(this.nodeType, this.tagName, [...this.classes], this.attrs, this._text);
+      for (const ch of this.children) c.appendChild(ch.cloneNode(true));
+      return c;
+    }
+    contains(target) {
+      if (this === target) return true;
+      return this.children.some(ch => ch.contains(target));
+    }
+    remove() {
+      if (!this.parent) return;
+      this.parent.children = this.parent.children.filter(c => c !== this);
+      this.parent = null;
+    }
+    replaceWith(node) {
+      if (!this.parent) return;
+      const idx = this.parent.children.indexOf(this);
+      if (idx >= 0) {
+        node.parent = this.parent;
+        this.parent.children.splice(idx, 1, node);
+        this.parent = null;
+      }
+    }
+    after(node) {
+      if (!this.parent) return;
+      const idx = this.parent.children.indexOf(this);
+      if (idx >= 0) {
+        node.parent = this.parent;
+        this.parent.children.splice(idx + 1, 0, node);
+      }
+    }
+    _matches(sel) {
+      if (sel.startsWith('.')) return this.classes.has(sel.slice(1));
+      if (sel === 'br') return this.tagName === 'BR';
+      if (sel === 'annotation[encoding="application/x-tex"]') {
+        return this.tagName === 'ANNOTATION' && this.attrs.encoding === 'application/x-tex';
+      }
+      return false;
+    }
+    querySelectorAll(sel) {
+      const out = [];
+      const walk = n => {
+        for (const ch of n.children) {
+          if (ch._matches(sel)) out.push(ch);
+          walk(ch);
+        }
+      };
+      walk(this);
+      return out;
+    }
+    querySelector(sel) {
+      return this.querySelectorAll(sel)[0] || null;
+    }
+    get childNodes() {
+      return this.children;
+    }
+    get parentElement() {
+      return this.parent && this.parent.nodeType === 1 ? this.parent : null;
+    }
+    get textContent() {
+      if (this.nodeType === 3) return this._text;
+      return this.children.map(c => c.textContent).join('');
+    }
+  }
+  const miniDoc = {
+    createElement: tag => new MiniNode(1, tag.toUpperCase()),
+    createTextNode: txt => new MiniNode(3, '', [], {}, txt),
+    createDocumentFragment: () => new MiniNode(11),
+  };
+
+  const makeKatex = (tex, visible) => {
+    const katex = new MiniNode(1, 'SPAN', ['katex']);
+    const mathml = new MiniNode(1, 'SPAN', ['katex-mathml']);
+    const ann = new MiniNode(1, 'ANNOTATION', [], { encoding: 'application/x-tex' });
+    ann.appendChild(miniDoc.createTextNode(tex));
+    mathml.appendChild(ann);
+    const html = new MiniNode(1, 'SPAN', ['katex-html']);
+    html.appendChild(miniDoc.createTextNode(visible));
+    katex.appendChild(mathml);
+    katex.appendChild(html);
+    return katex;
+  };
+
+  // Build simulated heading/cell: "Loss " + KaTeX + copy button
+  const cell = miniDoc.createElement('td');
+  cell.appendChild(miniDoc.createTextNode('Loss '));
+  cell.appendChild(makeKatex('L_2', 'L2'));
+  const copyBtn = new MiniNode(1, 'BUTTON', ['katex-copy-tex']);
+  copyBtn.appendChild(miniDoc.createTextNode('TeX'));
+  cell.appendChild(copyBtn);
+
+  assert.equal(extractCleanText(cell, 'markdown'), 'Loss $L_2$');
+  assert.equal(extractCleanText(cell, 'plain'), 'Loss L2');
+
+  // Nested list + blockquote fragment must preserve block line breaks instead of gluing items together.
+  const frag = miniDoc.createDocumentFragment();
+  const ul = miniDoc.createElement('ul');
+  const li1 = miniDoc.createElement('li');
+  li1.appendChild(miniDoc.createTextNode('First '));
+  li1.appendChild(makeKatex('x^2', 'x2'));
+  const li2 = miniDoc.createElement('li');
+  li2.appendChild(miniDoc.createTextNode('Second '));
+  li2.appendChild(makeKatex('y^2', 'y2'));
+  ul.appendChild(li1);
+  ul.appendChild(li2);
+  frag.appendChild(ul);
+
+  const bq = miniDoc.createElement('blockquote');
+  const p1 = miniDoc.createElement('p');
+  p1.appendChild(miniDoc.createTextNode('Quote one'));
+  const p2 = miniDoc.createElement('p');
+  p2.appendChild(miniDoc.createTextNode('Quote two'));
+  bq.appendChild(p1);
+  bq.appendChild(p2);
+  frag.appendChild(bq);
+
+  assert.equal(extractCleanText(frag, 'markdown'), 'First $x^2$\nSecond $y^2$\nQuote one\nQuote two');
+  assert.equal(extractCleanText(frag, 'plain'), 'First x2\nSecond y2\nQuote one\nQuote two');
+
+  // Same-row table fragment ([<td>, <td>] without wrapping <tr>) must separate cells with a tab.
+  const rowFrag = miniDoc.createDocumentFragment();
+  const td1 = miniDoc.createElement('td');
+  td1.appendChild(makeKatex('R^2', 'R2'));
+  const td2 = miniDoc.createElement('td');
+  td2.appendChild(miniDoc.createTextNode('0.99'));
+  rowFrag.appendChild(td1);
+  rowFrag.appendChild(td2);
+  assert.equal(extractCleanText(rowFrag, 'markdown'), '$R^2$\t0.99');
 });

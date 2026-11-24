@@ -145,8 +145,12 @@ function buildMenu() {
     ] },
     { label: '&Edit', submenu: [
       { role: 'undo', label: 'Undo' }, { role: 'redo', label: 'Redo' }, { type: 'separator' },
-      { role: 'cut', label: 'Cut' }, { role: 'copy', label: 'Copy' }, { role: 'paste', label: 'Paste' }, { role: 'selectAll', label: 'Select All' },
-      { type: 'separator' }, { id: 'find', label: 'Find…', accelerator: 'CmdOrCtrl+F', click: action('find') },
+      { role: 'cut', label: 'Cut' }, { role: 'copy', label: 'Copy' },
+      { id: 'copy-citation', label: 'Copy Quote with Citation', accelerator: 'CmdOrCtrl+Shift+C', click: action('copy-citation') },
+      { role: 'paste', label: 'Paste' }, { role: 'selectAll', label: 'Select All' },
+      { type: 'separator' },
+      { id: 'find', label: 'Find…', accelerator: 'CmdOrCtrl+F', click: action('find') },
+      { id: 'quick-jump', label: 'Quick Jump…', accelerator: 'CmdOrCtrl+K', click: action('quick-jump') },
     ] },
     { label: '&View', submenu: [
       { id: 'live-watch', label: 'Live Watch External Changes', type: 'checkbox', checked: state.liveWatch, click: item => {
@@ -167,7 +171,7 @@ function buildMenu() {
       { role: 'resetZoom', label: 'Reset Zoom' }, { role: 'zoomIn', label: 'Zoom In' }, { role: 'zoomOut', label: 'Zoom Out' },
     ] },
     { label: '&Help', submenu: [
-      { label: 'GitHub', click: () => shell.openExternal('https://github.com/KennyMcSimpson/inkglass') },
+      { label: 'GitHub', click: () => shell.openExternal('https://github.com/KennyMcSimpson/Inkglass') },
       { label: 'About Inkglass', click: () => dialog.showMessageBox(win, { type: 'info', title: 'Inkglass', message: `Inkglass ${app.getVersion()}`, detail: 'A calm, offline Windows Markdown reader built for living AI, research, and repository docs.\nRead-only by design — your source files are never modified.\nThird-party licenses are in the application\'s THIRD_PARTY_NOTICES folder.' }) },
     ] },
   ]));
@@ -221,7 +225,9 @@ else {
       try {
         const u = new URL(request.url); const filename = documents.get(u.hostname);
         if (!filename || !['GET', 'HEAD'].includes(request.method)) return new Response(null, { status: 403 });
-        const image = await resolveImage(filename, u.pathname.slice(1));
+        const ref = u.searchParams.has('ref') ? u.searchParams.get('ref') : u.pathname.slice(1);
+        const boundary = activeFolderRoot && isInside(activeFolderRoot, filename) ? activeFolderRoot : null;
+        const image = await resolveImage(filename, ref, boundary);
         const data = await fs.readFile(image.path);
         if (data.byteLength > 20 * 1024 * 1024) return new Response(null, { status: 413 });
         return new Response(request.method === 'HEAD' ? null : data, { headers: { 'content-type': image.mime, 'content-security-policy': "default-src 'none'; style-src 'unsafe-inline'", 'x-content-type-options': 'nosniff' } });
@@ -229,11 +235,26 @@ else {
     });
     handle('inkglass:open', () => openDialog());
     handle('inkglass:open-folder', () => openFolderDialog());
+    handle('inkglass:refresh-folder', async () => {
+      if (!activeFolderRoot) return null;
+      const listing = await listFolderDocuments(activeFolderRoot);
+      activeFolderRoot = listing.root;
+      return listing;
+    });
+    handle('inkglass:close-folder', () => {
+      activeFolderRoot = null;
+      return { ok: true };
+    });
     handle('inkglass:open-folder-file', async targetPath => {
       if (!activeFolderRoot || typeof targetPath !== 'string' || targetPath.length > 32768) throw new Error('No active folder selected');
       const real = await fs.realpath(targetPath);
       if (!isInside(activeFolderRoot, real)) throw new Error('File is outside the active folder');
       await queueOpen([real]);
+    });
+    handle('inkglass:recent', () => state.recent.map(filePath => ({ path: filePath, name: path.basename(filePath), dir: path.dirname(filePath) })));
+    handle('inkglass:open-recent', async targetPath => {
+      if (typeof targetPath !== 'string' || !state.recent.includes(targetPath)) throw new Error('File is not in the recent files list');
+      await queueOpen([targetPath]);
     });
     handle('inkglass:open-linked', async (sourceId, href) => {
       const sourcePath = documents.get(sourceId);

@@ -34,17 +34,19 @@ function isInside(root, filename) {
   return relative === '' || (!path.isAbsolute(relative) && relative !== '..' && !relative.startsWith('..' + path.sep));
 }
 
-async function resolveImage(documentPath, rawReference) {
+async function resolveImage(documentPath, rawReference, boundaryRoot = null) {
   if (typeof rawReference !== 'string' || rawReference.length > 4096 || rawReference.includes('\0')) throw new Error('Invalid image reference');
   let reference;
   try { reference = decodeURIComponent(rawReference.split(/[?#]/)[0]).replaceAll('\\', '/'); }
   catch { throw new Error('Malformed image reference'); }
   if (!reference || reference.startsWith('/') || /^[a-z][a-z\d+.-]*:/i.test(reference)) throw new Error('Only document-relative images are allowed');
-  const root = await fsp.realpath(path.dirname(documentPath));
-  const candidate = path.resolve(root, reference);
-  if (!isInside(root, candidate)) throw new Error('Image is outside the document folder');
+  const docDir = await fsp.realpath(path.dirname(documentPath));
+  const boundary = boundaryRoot ? await fsp.realpath(boundaryRoot) : docDir;
+  if (!isInside(boundary, docDir)) throw new Error('Document is outside the active folder boundary');
+  const candidate = path.resolve(docDir, reference);
+  if (!isInside(boundary, candidate)) throw new Error('Image is outside the authorized folder');
   const real = await fsp.realpath(candidate);
-  if (!isInside(root, real)) throw new Error('Image symlink is outside the document folder');
+  if (!isInside(boundary, real)) throw new Error('Image symlink is outside the authorized folder');
   const mime = IMAGE_TYPES[path.extname(real).toLowerCase()];
   if (!mime) throw new Error('Unsupported image type');
   const stat = await fsp.stat(real);
@@ -71,10 +73,48 @@ async function resolveLinkedDocument(currentDocPath, rawReference, boundaryRoot 
   if (!isInside(boundary, docDir)) throw new Error('Document is outside the active folder boundary');
   const candidate = path.resolve(docDir, reference);
   if (!isInside(boundary, candidate)) throw new Error('Linked document is outside the authorized folder');
-  const real = await fsp.realpath(candidate);
+
+  let resolvedTarget = candidate;
+  let stat = null;
+  try {
+    const realCandidate = await fsp.realpath(candidate);
+    if (!isInside(boundary, realCandidate)) throw new Error('Linked document symlink escapes the authorized folder');
+    const candidateStat = await fsp.stat(realCandidate);
+    if (candidateStat.isDirectory()) {
+      const entries = await fsp.readdir(realCandidate);
+      const readmeName = entries.find(name => name.toLowerCase() === 'readme.md');
+      if (readmeName) {
+        resolvedTarget = path.join(realCandidate, readmeName);
+      } else if (!reference.endsWith('/') && !TEXT_EXT.has(path.extname(candidate).toLowerCase())) {
+        const mdFallback = candidate + '.md';
+        if (!isInside(boundary, mdFallback)) throw new Error('Linked document is outside the authorized folder');
+        try {
+          await fsp.access(mdFallback);
+          resolvedTarget = mdFallback;
+        } catch {
+          throw new Error('Linked directory does not contain a README.md');
+        }
+      } else {
+        throw new Error('Linked directory does not contain a README.md');
+      }
+    } else {
+      resolvedTarget = realCandidate;
+      stat = candidateStat;
+    }
+  } catch (err) {
+    if (err && err.code === 'ENOENT' && !reference.endsWith('/') && !TEXT_EXT.has(path.extname(candidate).toLowerCase())) {
+      const mdCandidate = candidate + '.md';
+      if (!isInside(boundary, mdCandidate)) throw new Error('Linked document is outside the authorized folder');
+      resolvedTarget = mdCandidate;
+    } else {
+      throw err;
+    }
+  }
+
+  const real = await fsp.realpath(resolvedTarget);
   if (!isInside(boundary, real)) throw new Error('Linked document symlink escapes the authorized folder');
   if (!TEXT_EXT.has(path.extname(real).toLowerCase())) throw new Error('Linked file is not a supported Markdown or text document');
-  const stat = await fsp.stat(real);
+  if (!stat) stat = await fsp.stat(real);
   if (!stat.isFile() || stat.size > TEXT_LIMIT) throw new Error('Linked document exceeds 2 MB or is not a regular file');
   return { path: real, fragment };
 }

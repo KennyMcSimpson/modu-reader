@@ -1,7 +1,8 @@
 "use client";
 
 import { copyText } from "@/lib/clipboard";
-import { diffDocumentSections } from "@/lib/live-diff";
+import { disambiguateDocLabels, extractCleanText, formatRelativeToRoot } from "@/lib/clean-text";
+import { computeLineDiff, diffDocumentSections, extractHeadingLines, type DiffLine } from "@/lib/live-diff";
 import { formatMarkdownCitation } from "@/lib/citations";
 
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
@@ -9,18 +10,28 @@ import { flushSync } from "react-dom";
 import {
   AlignLeft,
   ArrowDown,
+  ArrowDownUp,
   ArrowLeft,
   ArrowRight,
   ArrowUp,
   BookOpen,
+  Check,
+  ChevronDown,
   ChevronRight,
+  ChevronUp,
   ClipboardPaste,
   Clock3,
   Columns2,
+  Compass,
+  Copy,
+  Eye,
   FileCode2,
+  FileDiff,
   FileText,
   Folder,
   FolderOpen,
+  Hash,
+  History,
   Keyboard,
   List,
   Loader2,
@@ -63,16 +74,37 @@ import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { desktop, type FolderListing, type NativeAction } from "@/lib/desktop";
+import { desktop, type FolderListing, type NativeAction, type RecentEntry } from "@/lib/desktop";
 import { DesktopFind } from "@/components/desktop-find";
 import { MarkdownDocument } from "@/components/markdown-document";
 import { welcome, formatGuide } from "@/lib/demo";
 import { copies, type Locale } from "@/lib/i18n";
 
 type Doc = { id: string; name: string; content: string; sample?: boolean; encoding?: string; nativeId?: string; path?: string };
-type Heading = { id: string; title: string; level: number };
+type Heading = { id: string; title: string; level: number; headingIndex: number };
 type Preferences = { theme: "light" | "dark" | "system"; size: number; line: number; width: string; font: string };
-type LiveUpdateBanner = { docId: string; changedCount: number; changedHeadings: string[]; updatedAt: string };
+type NavEntry = { docId: string; scrollTop?: number; headingId?: string };
+type LiveUpdateBanner = {
+  docId: string;
+  changedCount: number;
+  changedHeadings: string[];
+  changedSectionIndices: number[];
+  addedLines: number;
+  removedLines: number;
+  hunks: DiffLine[];
+  truncated: boolean;
+  appendedAtEof: boolean;
+  updatedAt: string;
+};
+type QuickJumpItem = {
+  key: string;
+  kind: "heading" | "doc" | "folder" | "recent";
+  label: string;
+  subtitle?: string;
+  badge: string;
+  searchText: string;
+  onSelect: () => void;
+};
 
 const initial: Preferences = { theme: "light", size: 17, line: 1.95, width: "comfortable", font: "sans" };
 const samples: Doc[] = [
@@ -168,27 +200,72 @@ function ReaderApp() {
   const [pasteText, setPasteText] = useState("");
   const [tocOpen, setTocOpen] = useState(false);
   const [findOpen, setFindOpen] = useState(false);
+  const [findSeed, setFindSeed] = useState<{ text: string; seq: number }>({ text: "", seq: 0 });
   const [assets, setAssets] = useState<Record<string, string>>({});
   const [liveWatch, setLiveWatch] = useState(true);
   const [alwaysOnTop, setAlwaysOnTop] = useState(false);
   const [folder, setFolder] = useState<FolderListing | null>(null);
+  const [folderRevision, setFolderRevision] = useState(0);
+  const [folderFilter, setFolderFilter] = useState("");
+  const [folderSort, setFolderSort] = useState<"name" | "recent">("name");
   const [liveUpdates, setLiveUpdates] = useState<Record<string, LiveUpdateBanner>>({});
+  const [diffDrawerOpen, setDiffDrawerOpen] = useState(false);
+  const [followLive, setFollowLive] = useState(false);
   const [changeCursor, setChangeCursor] = useState(0);
-  const [nav, setNav] = useState<{ items: string[]; index: number }>({ items: ["welcome"], index: 0 });
+  const [nav, setNav] = useState<{ items: NavEntry[]; index: number }>({ items: [{ docId: "welcome" }], index: 0 });
+  const [quickJumpOpen, setQuickJumpOpen] = useState(false);
+  const [quickJumpQuery, setQuickJumpQuery] = useState("");
+  const [quickJumpIndex, setQuickJumpIndex] = useState(0);
+  const [recentFiles, setRecentFiles] = useState<RecentEntry[]>([]);
+  const [copiedPath, setCopiedPath] = useState(false);
 
   const fileInput = useRef<HTMLInputElement>(null);
   const article = useRef<HTMLElement>(null);
   const scrollArea = useRef<HTMLDivElement>(null);
+  const splitSourceRef = useRef<HTMLDivElement>(null);
+  const quickJumpInputRef = useRef<HTMLInputElement>(null);
   const urls = useRef<string[]>([]);
   const depth = useRef(0);
   const importing = useRef(false);
   const positions = useRef<Record<string, number>>(loadSavedScrolls());
   const pendingFragment = useRef<string>("");
+  const pendingScrollTop = useRef<number | null>(null);
+  const diffBaselinesRef = useRef<Record<string, string>>({});
+  const followLiveRef = useRef(false);
+  followLiveRef.current = followLive;
 
   const doc = documents.find(d => d.id === activeId) || documents[0];
   const scrollKey = doc.path || doc.id;
   const displayName = doc.sample ? (doc.id === "welcome" ? copy.sidebar.sampleNames.welcome : copy.sidebar.sampleNames.guide) : doc.name;
   const dark = preferences.theme === "dark" || (preferences.theme === "system" && systemDark);
+
+  const openedDocs = useMemo(() => documents.filter(d => !d.sample), [documents]);
+  const docLabels = useMemo(() => disambiguateDocLabels(openedDocs), [openedDocs]);
+  const breadcrumbLabel = useMemo(() => {
+    if (doc.sample) return displayName;
+    const rel = doc.path ? formatRelativeToRoot(doc.path, folder?.root) : null;
+    if (rel) return rel;
+    return docLabels[doc.id] || displayName;
+  }, [displayName, doc.id, doc.path, doc.sample, docLabels, folder?.root]);
+
+  const headingLinesInfo = useMemo(() => extractHeadingLines(doc.content), [doc.content]);
+
+  const filteredFolderFiles = useMemo(() => {
+    if (!folder) return [];
+    const tokens = folderFilter.trim().toLowerCase().split(/\s+/).filter(Boolean);
+    const list = tokens.length
+      ? folder.files.filter(entry => {
+          const hay = entry.relativePath.toLowerCase();
+          return tokens.every(tok => hay.includes(tok));
+        })
+      : [...folder.files];
+    if (folderSort === "recent") {
+      list.sort((a, b) => b.modifiedAt - a.modifiedAt || a.relativePath.localeCompare(b.relativePath, undefined, { numeric: true, sensitivity: "base" }));
+    } else {
+      list.sort((a, b) => a.relativePath.localeCompare(b.relativePath, undefined, { numeric: true, sensitivity: "base" }));
+    }
+    return list;
+  }, [folder, folderFilter, folderSort]);
 
   const stats = useMemo(() => {
     const cjk = (doc.content.match(/[\u3400-\u9fff]/g) || []).length;
@@ -228,6 +305,12 @@ function ReaderApp() {
 
   useEffect(() => () => urls.current.forEach(url => URL.revokeObjectURL(url)), []);
   useEffect(() => { document.title = `${displayName} · ${copy.brand.english}`; }, [copy.brand.english, displayName]);
+  useEffect(() => { setDiffDrawerOpen(false); }, [activeId]);
+  useEffect(() => {
+    if (!copiedPath) return;
+    const t = setTimeout(() => setCopiedPath(false), 1600);
+    return () => clearTimeout(t);
+  }, [copiedPath]);
 
   const saveCurrentScroll = useCallback(() => {
     if (!scrollArea.current) return;
@@ -239,42 +322,115 @@ function ReaderApp() {
     (id: string, recordHistory = true) => {
       saveCurrentScroll();
       setActiveId(id);
-      if (mode === "source") setMode("read");
       setTocOpen(false);
       setOpenMobile(false);
       if (recordHistory) {
         setNav(prev => {
           const base = prev.items.slice(0, prev.index + 1);
-          if (base[base.length - 1] === id) return prev;
-          const items = [...base, id].slice(-40);
+          const last = base[base.length - 1];
+          if (last && last.docId === id && !last.headingId) return prev;
+          const items = [...base, { docId: id }].slice(-40);
           return { items, index: items.length - 1 };
         });
       }
     },
-    [mode, saveCurrentScroll, setOpenMobile],
+    [saveCurrentScroll, setOpenMobile],
+  );
+
+  const findArticleAnchor = useCallback((rawId: string): HTMLElement | null => {
+    const root = article.current;
+    if (!root || !rawId) return null;
+    if (rawId.startsWith("__heading_index__:")) {
+      const rawIdx = rawId.slice("__heading_index__:".length);
+      if (/^\d+$/.test(rawIdx)) {
+        return root.querySelector<HTMLElement>(`[data-heading-index="${rawIdx}"]`);
+      }
+      return null;
+    }
+    const candidates = rawId.startsWith("md-") ? [rawId] : ["md-" + rawId, rawId];
+    for (const candidate of candidates) {
+      const byId = document.getElementById(candidate);
+      if (byId && root.contains(byId)) return byId;
+    }
+    return null;
+  }, []);
+
+  const jumpTo = useCallback(
+    (id: string) => {
+      const target = findArticleAnchor(id);
+      if (!target || !scrollArea.current) return;
+      scrollArea.current.scrollTo({
+        top: scrollArea.current.scrollTop + target.getBoundingClientRect().top - scrollArea.current.getBoundingClientRect().top - 42,
+        behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "instant" : "smooth",
+      });
+      if (target.id) setActiveHeading(target.id);
+      setTocOpen(false);
+    },
+    [findArticleAnchor],
+  );
+
+  const restoreNavEntry = useCallback(
+    (entry: NavEntry, targetIndex: number) => {
+      setNav(prev => ({ ...prev, index: targetIndex }));
+      if (entry.docId === activeId) {
+        if (entry.headingId) {
+          if (mode === "source") {
+            pendingFragment.current = entry.headingId;
+            pendingScrollTop.current = typeof entry.scrollTop === "number" ? entry.scrollTop : null;
+            setMode("read");
+          } else if (findArticleAnchor(entry.headingId)) {
+            jumpTo(entry.headingId);
+          } else if (typeof entry.scrollTop === "number" && scrollArea.current) {
+            scrollArea.current.scrollTo({
+              top: entry.scrollTop,
+              behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "instant" : "smooth",
+            });
+          }
+        } else if (typeof entry.scrollTop === "number") {
+          if (mode === "source") {
+            pendingScrollTop.current = entry.scrollTop;
+            pendingFragment.current = "";
+            setMode("read");
+          } else if (scrollArea.current) {
+            scrollArea.current.scrollTo({
+              top: entry.scrollTop,
+              behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "instant" : "smooth",
+            });
+          }
+        }
+        return;
+      }
+      if (entry.headingId) {
+        pendingFragment.current = entry.headingId;
+        pendingScrollTop.current = typeof entry.scrollTop === "number" ? entry.scrollTop : null;
+      } else if (typeof entry.scrollTop === "number") {
+        pendingScrollTop.current = entry.scrollTop;
+        pendingFragment.current = "";
+      }
+      navigateToDoc(entry.docId, false);
+    },
+    [activeId, findArticleAnchor, jumpTo, mode, navigateToDoc],
   );
 
   const goBack = useCallback(() => {
     for (let i = nav.index - 1; i >= 0; i--) {
       const target = nav.items[i];
-      if (documents.some(d => d.id === target)) {
-        setNav(prev => ({ ...prev, index: i }));
-        navigateToDoc(target, false);
+      if (documents.some(d => d.id === target.docId)) {
+        restoreNavEntry(target, i);
         return;
       }
     }
-  }, [documents, nav, navigateToDoc]);
+  }, [documents, nav, restoreNavEntry]);
 
   const goForward = useCallback(() => {
     for (let i = nav.index + 1; i < nav.items.length; i++) {
       const target = nav.items[i];
-      if (documents.some(d => d.id === target)) {
-        setNav(prev => ({ ...prev, index: i }));
-        navigateToDoc(target, false);
+      if (documents.some(d => d.id === target.docId)) {
+        restoreNavEntry(target, i);
         return;
       }
     }
-  }, [documents, nav, navigateToDoc]);
+  }, [documents, nav, restoreNavEntry]);
 
   const openFiles = useCallback(
     async (files: File[]) => {
@@ -338,12 +494,40 @@ function ReaderApp() {
       const listing = await desktop.openFolder();
       if (listing) {
         setFolder(listing);
+        setFolderFilter("");
+        setFolderRevision(v => v + 1);
         if (listing.files.length) {
           toast.success(`Opened folder "${listing.name}" (${listing.files.length} files${listing.truncated ? "+" : ""})`);
         } else {
           toast.info(`No Markdown files found in "${listing.name}".`);
         }
       }
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : String(error));
+    }
+  }, []);
+
+  const refreshFolder = useCallback(async () => {
+    if (!desktop || !folder) return;
+    try {
+      const listing = await desktop.refreshFolder();
+      if (listing) {
+        setFolder(listing);
+        setFolderRevision(v => v + 1);
+        toast.success(`Refreshed "${listing.name}" (${listing.files.length} files${listing.truncated ? "+" : ""})`);
+      }
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : String(error));
+    }
+  }, [folder]);
+
+  const closeFolderDrawer = useCallback(async () => {
+    if (!desktop) return;
+    try {
+      await desktop.closeFolder();
+      setFolder(null);
+      setFolderFilter("");
+      setFolderRevision(v => v + 1);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : String(error));
     }
@@ -378,22 +562,75 @@ function ReaderApp() {
 
   const exportPdf = useCallback(async () => {
     if (!desktop) return;
+    if (!doc.content.trim()) {
+      toast.info("This document is empty — nothing to export.");
+      return;
+    }
+    const previousMode = mode;
     try {
-      // Force any off-screen lazy Mermaid diagrams to render before capturing PDF.
+      if (previousMode === "source") {
+        flushSync(() => setMode("read"));
+        await new Promise(resolve => requestAnimationFrame(() => resolve(undefined)));
+      }
+      // Force any off-screen lazy Mermaid diagrams and lazy images to load before capturing PDF.
       window.dispatchEvent(new Event("inkglass-prepare-print"));
-      for (let i = 0; i < 15; i++) {
-        if (!document.querySelector(".diagram-loading")) break;
+      const lazyImages = [...document.querySelectorAll<HTMLImageElement>('article img[loading="lazy"]')];
+      lazyImages.forEach(img => { img.loading = "eager"; });
+      const allImages = [...document.querySelectorAll<HTMLImageElement>("article img")];
+      if (allImages.length) {
+        const imageWait = Promise.allSettled(
+          allImages.map(img => {
+            if (img.complete) {
+              return typeof img.decode === "function" ? img.decode().catch(() => {}) : Promise.resolve();
+            }
+            return new Promise<void>(resolve => {
+              const finish = () => {
+                if (typeof img.decode === "function") void img.decode().catch(() => {}).finally(resolve);
+                else resolve();
+              };
+              img.addEventListener("load", finish, { once: true });
+              img.addEventListener("error", finish, { once: true });
+            });
+          }),
+        );
+        await Promise.race([imageWait, new Promise<void>(resolve => setTimeout(resolve, 2000))]);
+      }
+      const diagramDeadline = Date.now() + 2000;
+      while (document.querySelector(".diagram-loading") && Date.now() < diagramDeadline) {
         await new Promise(resolve => setTimeout(resolve, 100));
       }
       const res = await desktop.exportPdf(displayName);
       if (res?.ok) toast.success(copy.success.pdfExported);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : String(error));
+    } finally {
+      if (previousMode === "source") {
+        setMode("source");
+      }
     }
-  }, [copy.success.pdfExported, displayName]);
+  }, [copy.success.pdfExported, displayName, doc.content, mode]);
 
   const copyQuoteCitation = useCallback(async () => {
-    const selection = window.getSelection()?.toString().trim() || "";
+    const sel = window.getSelection();
+    let selection = "";
+    if (sel && sel.rangeCount > 0 && !sel.isCollapsed) {
+      const range = sel.getRangeAt(0);
+      const ancestorEl =
+        range.commonAncestorContainer.nodeType === Node.ELEMENT_NODE
+          ? (range.commonAncestorContainer as Element)
+          : range.commonAncestorContainer.parentElement;
+      const insideKatex = ancestorEl?.closest(".katex-display, .katex");
+      if (insideKatex) {
+        selection = extractCleanText(insideKatex, "markdown").trim();
+      } else {
+        const frag = range.cloneContents();
+        if (frag.querySelector(".katex, .katex-mathml, .katex-copy-tex")) {
+          selection = extractCleanText(frag, "markdown").trim();
+        } else {
+          selection = sel.toString().trim();
+        }
+      }
+    }
     const currentHeadingTitle = headings.find(h => h.id === activeHeading)?.title;
     const text = selection || currentHeadingTitle || displayName;
     const formatted = formatMarkdownCitation(text, displayName, currentHeadingTitle);
@@ -406,27 +643,66 @@ function ReaderApp() {
     }
   }, [activeHeading, copy.errors.copyFailed, copy.success.citationCopied, displayName, headings]);
 
+  const openFindBar = useCallback(() => {
+    const rawSel = window.getSelection()?.toString().trim() || "";
+    const seedText = rawSel && !rawSel.includes("\n") && rawSel.length <= 200 ? rawSel : "";
+    setFindSeed(prev => ({ text: seedText, seq: prev.seq + 1 }));
+    setFindOpen(true);
+    requestAnimationFrame(() => {
+      const input = document.querySelector<HTMLInputElement>(".desktop-find input");
+      input?.focus();
+      input?.select();
+    });
+  }, []);
+
+  const openQuickJump = useCallback(() => {
+    setQuickJumpQuery("");
+    setQuickJumpIndex(0);
+    setQuickJumpOpen(true);
+    if (desktop) {
+      void desktop.getRecent().then(setRecentFiles).catch(() => {});
+    }
+    requestAnimationFrame(() => {
+      quickJumpInputRef.current?.focus();
+    });
+  }, []);
+
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (!desktop && (e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "o") { e.preventDefault(); fileInput.current?.click(); }
+      if (!desktop && (e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey && e.key.toLowerCase() === "o") {
+        e.preventDefault();
+        fileInput.current?.click();
+      }
+      if ((e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey && e.key.toLowerCase() === "k") {
+        e.preventDefault();
+        openQuickJump();
+      }
+      if (!desktop && (e.ctrlKey || e.metaKey) && e.shiftKey && !e.altKey && e.key.toLowerCase() === "c") {
+        e.preventDefault();
+        void copyQuoteCitation();
+      }
       if (e.key === "Escape" && focus) { setFocus(false); setOpen(true); }
       if (e.altKey && e.key === "ArrowLeft") { e.preventDefault(); goBack(); }
       if (e.altKey && e.key === "ArrowRight") { e.preventDefault(); goForward(); }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [focus, goBack, goForward, setOpen]);
+  }, [copyQuoteCitation, focus, goBack, goForward, openQuickJump, setOpen]);
 
-  const jumpTo = useCallback((id: string) => {
-    const target = document.getElementById(id);
-    if (!target || !scrollArea.current) return;
-    scrollArea.current.scrollTo({
-      top: scrollArea.current.scrollTop + target.getBoundingClientRect().top - scrollArea.current.getBoundingClientRect().top - 42,
-      behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "instant" : "smooth",
-    });
-    setActiveHeading(id);
-    setTocOpen(false);
-  }, []);
+  // Auto-scroll active TOC link inside .toc-sidebar without disturbing document scroll.
+  useEffect(() => {
+    if (!activeHeading) return;
+    const sidebar = document.querySelector<HTMLElement>(".toc-sidebar");
+    const current = sidebar?.querySelector<HTMLElement>(".toc-link.current");
+    if (!sidebar || !current) return;
+    const sRect = sidebar.getBoundingClientRect();
+    const cRect = current.getBoundingClientRect();
+    if (cRect.top < sRect.top + 16) {
+      sidebar.scrollTop -= sRect.top + 16 - cRect.top;
+    } else if (cRect.bottom > sRect.bottom - 16) {
+      sidebar.scrollTop += cRect.bottom - (sRect.bottom - 16);
+    }
+  }, [activeHeading]);
 
   useEffect(() => {
     const area = scrollArea.current;
@@ -435,18 +711,37 @@ function ReaderApp() {
       return;
     }
     const frame = requestAnimationFrame(() => {
-      const nodes = [...(article.current?.querySelectorAll<HTMLElement>("h1,h2,h3,h4,h5,h6") || [])];
-      setHeadings(nodes.map(el => ({ id: el.id, title: el.textContent || copy.toc.untitled, level: Number(el.tagName[1]) })));
+      const nodes = [...(article.current?.querySelectorAll<HTMLElement>("h1,h2,h3,h4,h5,h6") || [])].filter(
+        el => !el.closest("blockquote, li"),
+      );
+      setHeadings(
+        nodes.map(el => {
+          const rawIdx = el.getAttribute("data-heading-index");
+          const parsedIdx = rawIdx !== null ? Number(rawIdx) : -1;
+          return {
+            id: el.id,
+            title: extractCleanText(el, "plain").replace(/\s+/g, " ").trim() || copy.toc.untitled,
+            level: Number(el.tagName[1]),
+            headingIndex: Number.isInteger(parsedIdx) ? parsedIdx : -1,
+          };
+        }),
+      );
       if (pendingFragment.current) {
         const frag = pendingFragment.current;
         pendingFragment.current = "";
-        const targetId = document.getElementById(frag) ? frag : "md-" + frag;
-        if (document.getElementById(targetId)) {
-          jumpTo(targetId);
+        const targetEl = findArticleAnchor(frag);
+        if (targetEl) {
+          pendingScrollTop.current = null;
+          jumpTo(targetEl.id || frag);
           return;
         }
       }
-      area.scrollTop = positions.current[scrollKey] || 0;
+      if (pendingScrollTop.current !== null) {
+        area.scrollTop = pendingScrollTop.current;
+        pendingScrollTop.current = null;
+      } else {
+        area.scrollTop = positions.current[scrollKey] || 0;
+      }
       update();
     });
     let scheduled = false;
@@ -454,11 +749,58 @@ function ReaderApp() {
       if (!area) return;
       const total = area.scrollHeight - area.clientHeight;
       setProgress(total > 0 ? Math.min(100, Math.max(0, Math.round((area.scrollTop / total) * 100))) : 100);
-      const nodes = article.current?.querySelectorAll<HTMLElement>("h1,h2,h3,h4,h5,h6");
-      let selected = nodes?.[0]?.id || "";
+      const rawNodes = article.current?.querySelectorAll<HTMLElement>("h1,h2,h3,h4,h5,h6");
+      const topNodes = rawNodes ? [...rawNodes].filter(el => !el.closest("blockquote, li")) : [];
+      let selected = topNodes[0]?.id || "";
       const edge = area.getBoundingClientRect().top + 150;
-      nodes?.forEach(el => { if (el.getBoundingClientRect().top <= edge) selected = el.id; });
+      topNodes.forEach(el => { if (el.getBoundingClientRect().top <= edge) selected = el.id; });
       setActiveHeading(selected);
+
+      // One-way heading-aligned scroll sync from rendered pane to sticky source pane in Split view.
+      if (mode === "split" && splitSourceRef.current) {
+        const sourceEl = splitSourceRef.current;
+        const maxSource = sourceEl.scrollHeight - sourceEl.clientHeight;
+        if (maxSource > 0) {
+          let ratio = total > 0 ? area.scrollTop / total : 0;
+          const hLines = headingLinesInfo.headings;
+          const domHeadings = topNodes.filter(el => {
+            const raw = el.getAttribute("data-heading-index");
+            return raw !== null && Number.isInteger(Number(raw)) && Number(raw) >= 0;
+          });
+          if (hLines.length > 0 && domHeadings.length > 0) {
+            const areaTop = area.getBoundingClientRect().top + 80;
+            let curDomIdx = -1;
+            for (let i = 0; i < domHeadings.length; i++) {
+              if (domHeadings[i].getBoundingClientRect().top <= areaTop) curDomIdx = i;
+              else break;
+            }
+            if (curDomIdx < 0) {
+              const firstTop = domHeadings[0].getBoundingClientRect().top - areaTop;
+              const firstHIdx = Number(domHeadings[0].getAttribute("data-heading-index"));
+              const firstLine = hLines[firstHIdx]?.line ?? 0;
+              const scrolled = Math.max(0, area.scrollTop);
+              const span = Math.max(1, scrolled + firstTop);
+              const targetLine = (scrolled / span) * firstLine;
+              ratio = targetLine / Math.max(1, headingLinesInfo.totalLines);
+            } else {
+              const curHIdx = Number(domHeadings[curDomIdx].getAttribute("data-heading-index"));
+              const curLine = hLines[curHIdx]?.line ?? 0;
+              const nextDom = domHeadings[curDomIdx + 1];
+              const nextHIdx = nextDom ? Number(nextDom.getAttribute("data-heading-index")) : -1;
+              const nextLine = nextHIdx >= 0 && hLines[nextHIdx] ? hLines[nextHIdx].line : headingLinesInfo.totalLines;
+              const curTop = domHeadings[curDomIdx].getBoundingClientRect().top - areaTop;
+              const nextTop = nextDom
+                ? nextDom.getBoundingClientRect().top - areaTop
+                : (article.current?.getBoundingClientRect().bottom ?? areaTop + 1) - areaTop;
+              const span = Math.max(1, nextTop - curTop);
+              const frac = Math.min(1, Math.max(0, -curTop / span));
+              const targetLine = curLine + frac * Math.max(0, nextLine - curLine);
+              ratio = targetLine / Math.max(1, headingLinesInfo.totalLines);
+            }
+          }
+          sourceEl.scrollTop = Math.round(Math.min(1, Math.max(0, ratio)) * maxSource);
+        }
+      }
       scheduled = false;
     }
     const onScroll = () => {
@@ -473,14 +815,34 @@ function ReaderApp() {
       area.removeEventListener("scroll", onScroll);
       observer.disconnect();
     };
-  }, [copy.toc.untitled, doc.id, doc.content, jumpTo, mode, scrollKey]);
+  }, [copy.toc.untitled, doc.id, doc.content, findArticleAnchor, headingLinesInfo, jumpTo, mode, scrollKey]);
 
   const handleLink = useCallback(
     (href: string) => {
       if (href.startsWith("#")) {
         let id = href.slice(1);
         try { id = decodeURIComponent(id); } catch {}
-        jumpTo(document.getElementById(id) ? id : "md-" + id);
+        const targetEl = findArticleAnchor(id);
+        const targetId = targetEl?.id || (id.startsWith("md-") ? id : "md-" + id);
+        if (targetEl && scrollArea.current) {
+          const currentScroll = scrollArea.current.scrollTop;
+          const targetScroll = Math.max(
+            0,
+            scrollArea.current.scrollTop + targetEl.getBoundingClientRect().top - scrollArea.current.getBoundingClientRect().top - 42,
+          );
+          setNav(prev => {
+            const base = prev.items.slice(0, prev.index + 1);
+            const updatedBase = [...base];
+            if (updatedBase.length > 0 && updatedBase[updatedBase.length - 1].docId === doc.id) {
+              updatedBase[updatedBase.length - 1] = { docId: doc.id, scrollTop: currentScroll };
+            } else {
+              updatedBase.push({ docId: doc.id, scrollTop: currentScroll });
+            }
+            const items = [...updatedBase, { docId: doc.id, headingId: targetId, scrollTop: targetScroll }].slice(-40);
+            return { items, index: items.length - 1 };
+          });
+        }
+        jumpTo(targetId);
         return;
       }
       if (desktop && doc.nativeId) {
@@ -496,7 +858,7 @@ function ReaderApp() {
       if (found) navigateToDoc(found.id, true);
       else toast.info(copy.errors.missingDocument);
     },
-    [copy.errors.missingDocument, doc.nativeId, documents, jumpTo, navigateToDoc],
+    [copy.errors.missingDocument, doc.id, doc.nativeId, documents, findArticleAnchor, jumpTo, navigateToDoc],
   );
 
   const closeDoc = useCallback(
@@ -506,24 +868,30 @@ function ReaderApp() {
       if (desktop && target?.nativeId) {
         void desktop.closeFile(target.nativeId).catch(() => {});
       }
+      delete diffBaselinesRef.current[id];
       const next = documents.filter(d => d.id !== id);
       const nextDocs = next.length ? next : samples;
       const nextActive = id === activeId ? nextDocs[0]?.id || "welcome" : activeId;
       setDocuments(nextDocs);
       if (id === activeId) {
         setActiveId(nextActive);
-        if (mode === "source") setMode("read");
       }
       setNav(prev => {
         const alive = new Set(nextDocs.map(d => d.id));
-        const filtered: string[] = [];
+        const filtered: NavEntry[] = [];
         for (const item of prev.items) {
-          if (alive.has(item) && filtered[filtered.length - 1] !== item) filtered.push(item);
+          if (!alive.has(item.docId)) continue;
+          const prevItem = filtered[filtered.length - 1];
+          if (prevItem && prevItem.docId === item.docId && !prevItem.headingId && !item.headingId) continue;
+          filtered.push(item);
         }
-        if (!filtered.length) return { items: [nextActive], index: 0 };
-        const idx = filtered.lastIndexOf(nextActive);
+        if (!filtered.length) return { items: [{ docId: nextActive }], index: 0 };
+        let idx = -1;
+        for (let i = filtered.length - 1; i >= 0; i--) {
+          if (filtered[i].docId === nextActive) { idx = i; break; }
+        }
         if (idx >= 0) return { items: filtered, index: idx };
-        const appended = [...filtered, nextActive].slice(-40);
+        const appended = [...filtered, { docId: nextActive }].slice(-40);
         return { items: appended, index: appended.length - 1 };
       });
       setLiveUpdates(old => {
@@ -533,7 +901,7 @@ function ReaderApp() {
         return copyMap;
       });
     },
-    [activeId, documents, mode, saveCurrentScroll],
+    [activeId, documents, saveCurrentScroll],
   );
 
   const activeLiveUpdate = liveUpdates[doc.id] || null;
@@ -548,23 +916,40 @@ function ReaderApp() {
     else target.scrollIntoView({ behavior: "smooth", block: "center" });
   }, [activeLiveUpdate, changeCursor, jumpTo]);
 
+  const dismissLiveUpdate = useCallback(() => {
+    diffBaselinesRef.current[doc.id] = doc.content;
+    setDiffDrawerOpen(false);
+    setLiveUpdates(old => {
+      if (!old[doc.id]) return old;
+      const next = { ...old };
+      delete next[doc.id];
+      return next;
+    });
+  }, [doc.content, doc.id]);
+
+  const copyFilePath = useCallback(async () => {
+    if (!doc.path) return;
+    try {
+      await copyText(doc.path);
+      setCopiedPath(true);
+      toast.success("Copied file path");
+    } catch {
+      toast.error(copy.errors.copyFailed);
+    }
+  }, [copy.errors.copyFailed, doc.path]);
+
   const nativeActions = useRef<(action: NativeAction) => void>(() => {});
   nativeActions.current = action => {
     if (action === "paste") setPasteOpen(true);
     if (action === "open-folder") void chooseFolder();
     if (action === "export-pdf") void exportPdf();
+    if (action === "copy-citation") void copyQuoteCitation();
+    if (action === "quick-jump") openQuickJump();
     if (action === "watch-on") setLiveWatch(true);
     if (action === "watch-off") setLiveWatch(false);
     if (action === "pin-on") setAlwaysOnTop(true);
     if (action === "pin-off") setAlwaysOnTop(false);
-    if (action === "find") {
-      setFindOpen(true);
-      requestAnimationFrame(() => {
-        const input = document.querySelector<HTMLInputElement>(".desktop-find input");
-        input?.focus();
-        input?.select();
-      });
-    }
+    if (action === "find") openFindBar();
     if (action === "focus") toggleFocus();
     if (action === "close") closeDoc(activeId);
     if (action === "reload") {
@@ -584,6 +969,64 @@ function ReaderApp() {
 
   useEffect(() => {
     if (!desktop) return;
+
+    const applyDiffForDoc = (docId: string, prevContent: string | undefined, nextContent: string, isActive: boolean, fromLiveWatch: boolean) => {
+      if (!(docId in diffBaselinesRef.current)) {
+        diffBaselinesRef.current[docId] = prevContent ?? nextContent;
+      }
+      const baseline = diffBaselinesRef.current[docId];
+      if (nextContent === baseline) {
+        setLiveUpdates(old => {
+          if (!old[docId]) return old;
+          const next = { ...old };
+          delete next[docId];
+          return next;
+        });
+        return;
+      }
+      const secDiff = diffDocumentSections(baseline, nextContent);
+      const lineDiff = computeLineDiff(baseline, nextContent);
+      if (secDiff.changedCount > 0 || lineDiff.addedLines > 0 || lineDiff.removedLines > 0) {
+        setLiveUpdates(old => ({
+          ...old,
+          [docId]: {
+            docId,
+            changedCount: secDiff.changedCount,
+            changedHeadings: secDiff.changedHeadings,
+            changedSectionIndices: secDiff.changedSectionIndices,
+            addedLines: lineDiff.addedLines,
+            removedLines: lineDiff.removedLines,
+            hunks: lineDiff.hunks,
+            truncated: lineDiff.truncated,
+            appendedAtEof: lineDiff.appendedAtEof,
+            updatedAt: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" }),
+          },
+        }));
+        if (isActive) {
+          setChangeCursor(0);
+          if (fromLiveWatch && followLiveRef.current) {
+            requestAnimationFrame(() => {
+              requestAnimationFrame(() => {
+                if (lineDiff.appendedAtEof && lineDiff.removedLines === 0 && scrollArea.current) {
+                  scrollArea.current.scrollTo({
+                    top: scrollArea.current.scrollHeight,
+                    behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "instant" : "smooth",
+                  });
+                  return;
+                }
+                const firstChanged = article.current?.querySelector<HTMLElement>('[data-changed="true"]');
+                if (firstChanged?.id) {
+                  jumpToRef.current(firstChanged.id);
+                } else if (firstChanged) {
+                  firstChanged.scrollIntoView({ behavior: "smooth", block: "start" });
+                }
+              });
+            });
+          }
+        }
+      }
+    };
+
     const unsubscribeDocuments = desktop.onDocuments(batch => {
       if (!batch.length) return;
       if (scrollArea.current) {
@@ -594,6 +1037,14 @@ function ReaderApp() {
         }
       }
       const incoming = batch.map(item => ({ ...item, nativeId: item.id }));
+      for (const item of incoming) {
+        const existing = docsRef.current.find(d => d.id === item.id);
+        if (!existing) {
+          diffBaselinesRef.current[item.id] = item.content;
+        } else if (existing.content !== item.content) {
+          applyDiffForDoc(item.id, existing.content, item.content, item.id === activeIdRef.current || item.id === incoming[0].id, false);
+        }
+      }
       setDocuments(old => {
         const next = [...old];
         for (const item of incoming) {
@@ -617,8 +1068,9 @@ function ReaderApp() {
       setActiveId(incoming[0].id);
       setNav(prev => {
         const base = prev.items.slice(0, prev.index + 1);
-        if (base[base.length - 1] === incoming[0].id) return prev;
-        const items = [...base, incoming[0].id].slice(-40);
+        const last = base[base.length - 1];
+        if (last && last.docId === incoming[0].id && !last.headingId) return prev;
+        const items = [...base, { docId: incoming[0].id }].slice(-40);
         return { items, index: items.length - 1 };
       });
       setOpenMobile(false);
@@ -633,20 +1085,8 @@ function ReaderApp() {
         }
       }
       const existing = docsRef.current.find(d => d.id === updated.id);
-      const diff = existing ? diffDocumentSections(existing.content, updated.content) : null;
       setDocuments(old => old.map(item => (item.id === updated.id ? { ...item, ...updated, nativeId: updated.id } : item)));
-      if (diff && diff.changedCount > 0) {
-        setLiveUpdates(old => ({
-          ...old,
-          [updated.id]: {
-            docId: updated.id,
-            changedCount: diff.changedCount,
-            changedHeadings: diff.changedHeadings,
-            updatedAt: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" }),
-          },
-        }));
-        if (updated.id === activeIdRef.current) setChangeCursor(0);
-      }
+      applyDiffForDoc(updated.id, existing?.content, updated.content, updated.id === activeIdRef.current, true);
     });
 
     const unsubscribeActions = desktop.onAction(action => nativeActions.current(action));
@@ -734,25 +1174,161 @@ function ReaderApp() {
     }
   };
 
+  const quickJumpItems = useMemo<QuickJumpItem[]>(() => {
+    const items: QuickJumpItem[] = [];
+    const seenPaths = new Set<string>();
+
+    // 1. Current document headings (derived from source lines when in Source mode)
+    const activeHeadings: Heading[] =
+      mode === "source"
+        ? headingLinesInfo.headings.map(h => ({
+            id: `__heading_index__:${h.index}`,
+            title: h.title || copy.toc.untitled,
+            level: h.level,
+            headingIndex: h.index,
+          }))
+        : headings;
+
+    for (const h of activeHeadings) {
+      items.push({
+        key: `heading:${h.id}:${h.headingIndex}`,
+        kind: "heading",
+        label: h.title,
+        subtitle: displayName,
+        badge: `H${h.level}`,
+        searchText: `${h.title} h${h.level}`.toLowerCase(),
+        onSelect: () => {
+          if (mode === "source") {
+            pendingFragment.current = h.id;
+            setMode("read");
+          } else {
+            jumpTo(h.id);
+          }
+        },
+      });
+    }
+
+    // 2. Opened documents (local + sample)
+    for (const d of documents) {
+      if (d.path) seenPaths.add(d.path.toLowerCase());
+      const label = d.sample
+        ? d.id === "welcome"
+          ? copy.sidebar.sampleNames.welcome
+          : copy.sidebar.sampleNames.guide
+        : docLabels[d.id] || d.name;
+      items.push({
+        key: `doc:${d.id}`,
+        kind: "doc",
+        label,
+        subtitle: d.path || (d.sample ? "Built-in guide" : "Pasted document"),
+        badge: d.id === activeId ? "Current" : "Open",
+        searchText: `${label} ${d.name} ${d.path || ""}`.toLowerCase(),
+        onSelect: () => navigateToDoc(d.id, true),
+      });
+    }
+
+    // 3. Active folder files
+    if (folder) {
+      for (const entry of folder.files) {
+        if (seenPaths.has(entry.path.toLowerCase())) continue;
+        seenPaths.add(entry.path.toLowerCase());
+        items.push({
+          key: `folder:${entry.path}`,
+          kind: "folder",
+          label: entry.relativePath,
+          subtitle: folder.name,
+          badge: "Folder",
+          searchText: `${entry.relativePath} ${entry.name}`.toLowerCase(),
+          onSelect: () => {
+            if (desktop) void desktop.openFolderFile(entry.path).catch(err => toast.error(String(err)));
+          },
+        });
+      }
+    }
+
+    // 4. Recent files (main process validates target is inside state.recent)
+    if (desktop) {
+      for (const rec of recentFiles) {
+        if (seenPaths.has(rec.path.toLowerCase())) continue;
+        seenPaths.add(rec.path.toLowerCase());
+        items.push({
+          key: `recent:${rec.path}`,
+          kind: "recent",
+          label: rec.name,
+          subtitle: rec.dir,
+          badge: "Recent",
+          searchText: `${rec.name} ${rec.dir} ${rec.path}`.toLowerCase(),
+          onSelect: () => {
+            if (desktop) void desktop.openRecent(rec.path).catch(err => toast.error(String(err)));
+          },
+        });
+      }
+    }
+
+    const tokens = quickJumpQuery.trim().toLowerCase().split(/\s+/).filter(Boolean);
+    if (!tokens.length) return items.slice(0, 60);
+    return items.filter(item => tokens.every(tok => item.searchText.includes(tok))).slice(0, 60);
+  }, [
+    activeId,
+    copy.sidebar.sampleNames.guide,
+    copy.sidebar.sampleNames.welcome,
+    copy.toc.untitled,
+    displayName,
+    docLabels,
+    documents,
+    folder,
+    headingLinesInfo,
+    headings,
+    jumpTo,
+    mode,
+    navigateToDoc,
+    quickJumpQuery,
+    recentFiles,
+  ]);
+
+  useEffect(() => {
+    setQuickJumpIndex(0);
+  }, [quickJumpQuery, quickJumpOpen]);
+
+  useEffect(() => {
+    if (!quickJumpOpen) return;
+    const activeEl = document.querySelector<HTMLElement>('.quick-jump-item[data-selected="true"]');
+    activeEl?.scrollIntoView({ block: "nearest" });
+  }, [quickJumpIndex, quickJumpOpen]);
+
+  const executeQuickJump = (item?: QuickJumpItem) => {
+    if (!item) return;
+    setQuickJumpOpen(false);
+    item.onSelect();
+  };
+
   const activeChangedHeadings = activeLiveUpdate ? activeLiveUpdate.changedHeadings : [];
+  const activeChangedIndices = activeLiveUpdate ? activeLiveUpdate.changedSectionIndices : [];
+  const activeChangedIndexSet = useMemo(() => new Set(activeChangedIndices), [activeChangedIndices]);
   const docIdSet = useMemo(() => new Set(documents.map(d => d.id)), [documents]);
-  const canBack = nav.items.slice(0, nav.index).some(id => docIdSet.has(id));
-  const canForward = nav.items.slice(nav.index + 1).some(id => docIdSet.has(id));
+  const canBack = nav.items.slice(0, nav.index).some(item => docIdSet.has(item.docId));
+  const canForward = nav.items.slice(nav.index + 1).some(item => docIdSet.has(item.docId));
 
   const toc = (
     <nav aria-label={copy.toc.title} className="toc-links">
       {headings.length ? (
-        headings.map(h => (
-          <button
-            key={h.id}
-            className={`toc-link level-${h.level} ${activeHeading === h.id ? "current" : ""} ${activeChangedHeadings.includes(h.title) ? "is-changed" : ""}`}
-            style={{ paddingLeft: `${Math.max(0, h.level - 2) * 12 + 16}px` }}
-            onClick={() => jumpTo(h.id)}
-            title={h.title}
-          >
-            {h.title}
-          </button>
-        ))
+        headings.map(h => {
+          const isChanged =
+            activeChangedIndexSet.size > 0
+              ? activeChangedIndexSet.has(h.headingIndex)
+              : activeChangedHeadings.includes(h.title);
+          return (
+            <button
+              key={`${h.id}-${h.headingIndex}`}
+              className={`toc-link level-${h.level} ${activeHeading === h.id ? "current" : ""} ${isChanged ? "is-changed" : ""}`}
+              style={{ paddingLeft: `${Math.max(0, h.level - 2) * 12 + 16}px` }}
+              onClick={() => jumpTo(h.id)}
+              title={h.title}
+            >
+              {h.title}
+            </button>
+          );
+        })
       ) : (
         <p className="toc-empty">{mode === "source" ? copy.toc.sourceHint : copy.toc.empty}</p>
       )}
@@ -761,7 +1337,7 @@ function ReaderApp() {
 
   return (
     <div
-      className={`reader-app ${focus ? "focus-mode" : ""}`}
+      className={`reader-app ${focus ? "focus-mode" : ""} ${mode === "split" ? "is-split-mode" : ""}`}
       onDragEnter={e => { if (e.dataTransfer.types.includes("Files")) { e.preventDefault(); depth.current++; setDragging(true); } }}
       onDragLeave={e => { e.preventDefault(); depth.current--; if (depth.current <= 0) setDragging(false); }}
       onDragOver={e => { if (e.dataTransfer.types.includes("Files")) { e.preventDefault(); e.dataTransfer.dropEffect = "copy"; } }}
@@ -798,23 +1374,25 @@ function ReaderApp() {
           </div>
         </SidebarHeader>
         <SidebarContent className="file-list-area">
-          <div className="section-label">{copy.sidebar.reading}<span>{documents.filter(d => !d.sample).length}</span></div>
+          <div className="section-label">{copy.sidebar.reading}<span>{openedDocs.length}</span></div>
           <SidebarMenu>
-            {documents
-              .filter(d => !d.sample)
-              .map(d => (
+            {openedDocs.map(d => {
+              const hasUnreadDiff = d.id !== activeId && Boolean(liveUpdates[d.id]);
+              return (
                 <SidebarMenuItem key={d.id}>
                   <SidebarMenuButton className="file-item" isActive={d.id === activeId} onClick={() => navigateToDoc(d.id, true)} title={d.path || d.name}>
                     <FileText size={17} />
-                    <span>{d.name}</span>
+                    <span>{docLabels[d.id] || d.name}</span>
+                    {hasUnreadDiff && <span className="unread-diff-dot" title="Updated on disk" aria-label="Updated on disk" />}
                   </SidebarMenuButton>
                   <SidebarMenuAction className="file-close" showOnHover onClick={() => closeDoc(d.id)} aria-label={copy.actions.closeDocument(d.name)}>
                     <X size={13} />
                   </SidebarMenuAction>
                 </SidebarMenuItem>
-              ))}
+              );
+            })}
           </SidebarMenu>
-          {!documents.some(d => !d.sample) && !folder && (
+          {!openedDocs.length && !folder && (
             <div className="files-empty">
               <FolderOpen size={24} strokeWidth={1.25} />
               <p>{copy.sidebar.emptyTitle}</p>
@@ -824,23 +1402,67 @@ function ReaderApp() {
           {folder && (
             <>
               <div className="section-label folder-label" title={folder.root}>
-                <span>{copy.sidebar.folder}: {folder.name}</span>
-                <span>{folder.files.length}{folder.truncated ? "+" : ""}</span>
+                <span className="folder-title-text">{copy.sidebar.folder}: {folder.name}</span>
+                <div className="folder-header-actions">
+                  <span className="folder-count">{filteredFolderFiles.length}{folder.truncated ? "+" : ""}</span>
+                  <button
+                    type="button"
+                    className="folder-action-btn"
+                    aria-label="Refresh folder"
+                    title="Refresh folder"
+                    onClick={() => void refreshFolder()}
+                  >
+                    <RefreshCw size={12} />
+                  </button>
+                  <button
+                    type="button"
+                    className="folder-action-btn"
+                    aria-label="Close folder"
+                    title="Close folder"
+                    onClick={() => void closeFolderDrawer()}
+                  >
+                    <X size={13} />
+                  </button>
+                </div>
+              </div>
+              <div className="folder-controls">
+                <input
+                  type="text"
+                  className="folder-filter-input"
+                  value={folderFilter}
+                  onChange={e => setFolderFilter(e.target.value)}
+                  placeholder="Filter files…"
+                  aria-label="Filter folder files"
+                />
+                <button
+                  type="button"
+                  className="folder-sort-btn"
+                  aria-label="Sort folder files"
+                  title={folderSort === "name" ? "Sorted A–Z (click for Recent)" : "Sorted by Recent (click for A–Z)"}
+                  onClick={() => setFolderSort(s => (s === "name" ? "recent" : "name"))}
+                >
+                  <ArrowDownUp size={11} />
+                  <span>{folderSort === "name" ? "A–Z" : "Recent"}</span>
+                </button>
               </div>
               <SidebarMenu>
-                {folder.files.map(entry => (
-                  <SidebarMenuItem key={entry.path}>
-                    <SidebarMenuButton
-                      className="file-item folder-file-item"
-                      isActive={doc.path === entry.path}
-                      onClick={() => { if (desktop) void desktop.openFolderFile(entry.path).catch(err => toast.error(String(err))); }}
-                      title={entry.relativePath}
-                    >
-                      <FileText size={15} />
-                      <span>{entry.relativePath}</span>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                ))}
+                {filteredFolderFiles.length ? (
+                  filteredFolderFiles.map(entry => (
+                    <SidebarMenuItem key={entry.path}>
+                      <SidebarMenuButton
+                        className="file-item folder-file-item"
+                        isActive={doc.path === entry.path}
+                        onClick={() => { if (desktop) void desktop.openFolderFile(entry.path).catch(err => toast.error(String(err))); }}
+                        title={entry.relativePath}
+                      >
+                        <FileText size={15} />
+                        <span>{entry.relativePath}</span>
+                      </SidebarMenuButton>
+                    </SidebarMenuItem>
+                  ))
+                ) : (
+                  <p className="folder-empty-filter">No matching files</p>
+                )}
               </SidebarMenu>
             </>
           )}
@@ -901,7 +1523,18 @@ function ReaderApp() {
               <span className="breadcrumb-divider" />
               <span className="breadcrumb-parent">{doc.sample ? copy.breadcrumb.guide : copy.breadcrumb.documents}</span>
               <ChevronRight size={14} className="breadcrumb-chevron" />
-              <span className="current-filename" title={doc.path || displayName}>{displayName}</span>
+              <span className="current-filename" title={doc.path || displayName}>{breadcrumbLabel}</span>
+              {doc.path && (
+                <button
+                  type="button"
+                  className="copy-path-btn"
+                  aria-label="Copy file path"
+                  title="Copy full file path"
+                  onClick={() => void copyFilePath()}
+                >
+                  {copiedPath ? <Check size={13} /> : <Copy size={13} />}
+                </button>
+              )}
             </div>
             <div className="reading-tools">
               <TabsList className="view-tabs" aria-label={copy.tabs.aria}>
@@ -910,13 +1543,16 @@ function ReaderApp() {
                 <TabsTrigger value="source"><FileCode2 size={15} /><span>{copy.tabs.source}</span></TabsTrigger>
               </TabsList>
               <span className="tools-divider" />
+              <IconButton label="Quick jump (Ctrl+K)" onClick={openQuickJump}>
+                <Compass size={16} />
+              </IconButton>
               {desktop && doc.nativeId && (
                 <IconButton label={liveWatch ? copy.actions.liveWatchOn : copy.actions.liveWatchOff} active={liveWatch} className={liveWatch ? "live-watch-active" : ""} onClick={() => void toggleLiveWatch()}>
                   <Radio size={16} />
                 </IconButton>
               )}
               {desktop && (
-                <IconButton label="Find text (Ctrl+F)" active={findOpen} onClick={() => setFindOpen(!findOpen)}>
+                <IconButton label="Find text (Ctrl+F)" active={findOpen} onClick={() => { if (findOpen) setFindOpen(false); else openFindBar(); }}>
                   <Search size={17} />
                 </IconButton>
               )}
@@ -988,29 +1624,75 @@ function ReaderApp() {
             </div>
           </header>
 
-          {desktop && findOpen && <DesktopFind documentId={doc.id} content={doc.content} mode={mode} onClose={() => setFindOpen(false)} />}
+          {desktop && findOpen && <DesktopFind documentId={doc.id} content={doc.content} mode={mode} seed={findSeed} onClose={() => setFindOpen(false)} />}
 
           {activeLiveUpdate && (
-            <div className="live-diff-bar" role="status">
-              <span className="live-dot-pulse" />
-              <span>
-                Updated live at {activeLiveUpdate.updatedAt} · {activeLiveUpdate.changedCount} section{activeLiveUpdate.changedCount === 1 ? "" : "s"} changed
-              </span>
-              {activeLiveUpdate.changedHeadings.length > 0 && (
-                <button type="button" className="live-diff-btn" onClick={jumpToNextChange}>
-                  <ArrowDown size={13} />
-                  <span>Next change</span>
-                </button>
+            <>
+              <div className="live-diff-bar" role="status">
+                <span className="live-dot-pulse" />
+                <span className="live-diff-summary">
+                  Updated at {activeLiveUpdate.updatedAt} ·{" "}
+                  <strong className="diff-stat-add">+{activeLiveUpdate.addedLines}</strong> /{" "}
+                  <strong className="diff-stat-del">-{activeLiveUpdate.removedLines}</strong> lines
+                  {activeLiveUpdate.changedCount > 0 && (
+                    <> · {activeLiveUpdate.changedCount} section{activeLiveUpdate.changedCount === 1 ? "" : "s"} changed</>
+                  )}
+                </span>
+                <div className="live-diff-actions">
+                  {activeLiveUpdate.hunks.length > 0 && (
+                    <button
+                      type="button"
+                      className={`live-diff-toggle ${diffDrawerOpen ? "is-active" : ""}`}
+                      aria-expanded={diffDrawerOpen}
+                      onClick={() => setDiffDrawerOpen(v => !v)}
+                    >
+                      <FileDiff size={13} />
+                      <span>{diffDrawerOpen ? "Hide diff" : "Show diff"}</span>
+                      {diffDrawerOpen ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    className={`live-diff-toggle ${followLive ? "is-active" : ""}`}
+                    aria-pressed={followLive}
+                    title="Auto-scroll to incoming live edits"
+                    onClick={() => setFollowLive(v => !v)}
+                  >
+                    <Eye size={13} />
+                    <span>{followLive ? "Following" : "Follow"}</span>
+                  </button>
+                  {(activeLiveUpdate.changedSectionIndices.length > 0 || activeLiveUpdate.changedHeadings.length > 0) && (
+                    <button type="button" className="live-diff-btn" onClick={jumpToNextChange}>
+                      <ArrowDown size={13} />
+                      <span>Next change</span>
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    className="live-diff-dismiss"
+                    onClick={dismissLiveUpdate}
+                    aria-label="Dismiss live update notice"
+                  >
+                    <X size={14} />
+                  </button>
+                </div>
+              </div>
+              {diffDrawerOpen && activeLiveUpdate.hunks.length > 0 && (
+                <div className="live-diff-drawer" aria-label="Line-level diff">
+                  <pre>
+                    {activeLiveUpdate.hunks.map((line, i) => (
+                      <div key={i} className={`diff-line diff-line-${line.kind}`}>
+                        <span className="diff-gutter">{line.kind === "add" ? "+" : line.kind === "del" ? "-" : " "}</span>
+                        <span>{line.text || " "}</span>
+                      </div>
+                    ))}
+                  </pre>
+                  {activeLiveUpdate.truncated && (
+                    <div className="diff-truncated-note">Showing compact preview of a large change set.</div>
+                  )}
+                </div>
               )}
-              <button
-                type="button"
-                className="live-diff-dismiss"
-                onClick={() => setLiveUpdates(old => { const next = { ...old }; delete next[doc.id]; return next; })}
-                aria-label="Dismiss live update notice"
-              >
-                <X size={14} />
-              </button>
-            </div>
+            </>
           )}
 
           <div className={`content-layout ${mode === "split" ? "is-split" : ""}`}>
@@ -1026,7 +1708,17 @@ function ReaderApp() {
                 <TabsContent value="read" className="reading-panel">
                   {doc.content.trim() ? (
                     <article className={`markdown-body font-${preferences.font}`} ref={article}>
-                      <MarkdownDocument documentId={doc.nativeId} content={doc.content} dark={dark} assets={assets} onLink={handleLink} locale={locale} changedHeadings={activeChangedHeadings} />
+                      <MarkdownDocument
+                        documentId={doc.nativeId}
+                        content={doc.content}
+                        dark={dark}
+                        assets={assets}
+                        onLink={handleLink}
+                        locale={locale}
+                        changedHeadings={activeChangedHeadings}
+                        changedSectionIndices={activeChangedIndices}
+                        mediaVersion={folderRevision}
+                      />
                     </article>
                   ) : (
                     <article ref={article} className="empty-document">
@@ -1042,10 +1734,20 @@ function ReaderApp() {
                 <TabsContent value="split" className="split-panel">
                   <div className="split-pane-rendered reading-panel">
                     <article className={`markdown-body font-${preferences.font}`} ref={mode === "split" ? article : undefined}>
-                      <MarkdownDocument documentId={doc.nativeId} content={doc.content} dark={dark} assets={assets} onLink={handleLink} locale={locale} changedHeadings={activeChangedHeadings} />
+                      <MarkdownDocument
+                        documentId={doc.nativeId}
+                        content={doc.content}
+                        dark={dark}
+                        assets={assets}
+                        onLink={handleLink}
+                        locale={locale}
+                        changedHeadings={activeChangedHeadings}
+                        changedSectionIndices={activeChangedIndices}
+                        mediaVersion={folderRevision}
+                      />
                     </article>
                   </div>
-                  <div className="split-pane-source source-panel">
+                  <div className="split-pane-source source-panel" ref={splitSourceRef}>
                     <div className="source-heading">
                       <span>{copy.stats.sourceTitle}</span>
                       <button onClick={async () => { try { await copyText(doc.content); toast.success(copy.success.copied); } catch { toast.error(copy.errors.copyFailed); } }}>
@@ -1105,6 +1807,77 @@ function ReaderApp() {
             <Button variant="ghost" onClick={() => setPasteOpen(false)}>{copy.actions.cancel}</Button>
             <Button onClick={readPaste} disabled={!pasteText.trim()}>{copy.actions.startReading}<ChevronRight size={16} /></Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={quickJumpOpen} onOpenChange={setQuickJumpOpen}>
+        <DialogContent className="quick-jump-dialog">
+          <DialogHeader className="sr-only">
+            <DialogTitle>Quick Jump</DialogTitle>
+            <DialogDescription>Jump to headings, opened documents, folder files, or recent files.</DialogDescription>
+          </DialogHeader>
+          <div className="quick-jump-input-row">
+            <Search size={16} aria-hidden="true" />
+            <input
+              ref={quickJumpInputRef}
+              type="text"
+              className="quick-jump-input"
+              aria-label="Quick jump search"
+              placeholder="Jump to heading, open doc, folder file, or recent…"
+              value={quickJumpQuery}
+              onChange={e => setQuickJumpQuery(e.target.value)}
+              onKeyDown={e => {
+                if (e.key === "ArrowDown") {
+                  e.preventDefault();
+                  if (quickJumpItems.length) setQuickJumpIndex(i => (i + 1) % quickJumpItems.length);
+                } else if (e.key === "ArrowUp") {
+                  e.preventDefault();
+                  if (quickJumpItems.length) setQuickJumpIndex(i => (i - 1 + quickJumpItems.length) % quickJumpItems.length);
+                } else if (e.key === "Enter") {
+                  e.preventDefault();
+                  executeQuickJump(quickJumpItems[quickJumpIndex]);
+                } else if (e.key === "Escape") {
+                  e.preventDefault();
+                  setQuickJumpOpen(false);
+                }
+              }}
+            />
+          </div>
+          <div className="quick-jump-list" role="listbox" aria-label="Quick jump results">
+            {quickJumpItems.length ? (
+              quickJumpItems.map((item, idx) => (
+                <button
+                  key={item.key}
+                  type="button"
+                  role="option"
+                  aria-selected={idx === quickJumpIndex}
+                  data-selected={idx === quickJumpIndex ? "true" : "false"}
+                  className="quick-jump-item"
+                  onMouseEnter={() => setQuickJumpIndex(idx)}
+                  onClick={() => executeQuickJump(item)}
+                >
+                  <span className="quick-jump-icon">
+                    {item.kind === "heading" ? (
+                      <Hash size={14} />
+                    ) : item.kind === "folder" ? (
+                      <Folder size={14} />
+                    ) : item.kind === "recent" ? (
+                      <History size={14} />
+                    ) : (
+                      <FileText size={14} />
+                    )}
+                  </span>
+                  <span className="quick-jump-text">
+                    <span className="quick-jump-label">{item.label}</span>
+                    {item.subtitle && <span className="quick-jump-sub">{item.subtitle}</span>}
+                  </span>
+                  <span className="quick-jump-badge">{item.badge}</span>
+                </button>
+              ))
+            ) : (
+              <div className="quick-jump-empty">No matching headings or documents</div>
+            )}
+          </div>
         </DialogContent>
       </Dialog>
 

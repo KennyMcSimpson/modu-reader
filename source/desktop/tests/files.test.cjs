@@ -47,7 +47,9 @@ test('image and linked-document references stay within authorized folder boundar
   await fs.writeFile(path.join(docs, 'private.txt'), 'private');
   await fs.writeFile(path.join(docs, 'note.md'), '# Note');
   await fs.writeFile(path.join(docs, 'guide.md'), '# Guide');
+  await fs.writeFile(path.join(docs, 'v2.0.md'), '# Release 2.0');
   await fs.writeFile(path.join(sub, 'child.md'), '# Child');
+  await fs.writeFile(path.join(sub, 'README.md'), '# Nested Index');
   await fs.writeFile(path.join(docs, 'bad.exe'), 'nope');
   const doc = path.join(docs, 'note.md');
   const childDoc = path.join(sub, 'child.md');
@@ -58,10 +60,34 @@ test('image and linked-document references stay within authorized folder boundar
     await assert.rejects(resolveImage(doc, ref), undefined, ref);
   }
 
+  // Cross-subdirectory relative image is rejected without a folder boundary, allowed inside docs/,
+  // and rejected when attempting to escape docs/.
+  await assert.rejects(resolveImage(childDoc, '../images/%E5%9B%BE%20%E7%89%87.png'), /outside/);
+  const crossSubImage = await resolveImage(childDoc, '../images/%E5%9B%BE%20%E7%89%87.png', docs);
+  assert.equal(crossSubImage.mime, 'image/png');
+  assert.equal(crossSubImage.path, await fs.realpath(path.join(docs, 'images', '图 片.png')));
+  await assert.rejects(resolveImage(childDoc, '../../private.png', docs), /outside/);
+
   // Relative Markdown links inside the document folder work, including fragments.
   const linked = await resolveLinkedDocument(doc, './nested/child.md#section-1');
   assert.equal(linked.path, await fs.realpath(childDoc));
   assert.equal(linked.fragment, 'section-1');
+
+  // Directory links resolve README.md and extensionless links resolve .md within the authorized boundary.
+  const dirLinked = await resolveLinkedDocument(doc, './nested/#overview', docs);
+  assert.equal(dirLinked.path, await fs.realpath(path.join(sub, 'README.md')));
+  assert.equal(dirLinked.fragment, 'overview');
+  const dirNoSlash = await resolveLinkedDocument(doc, './nested', docs);
+  assert.equal(dirNoSlash.path, await fs.realpath(path.join(sub, 'README.md')));
+  const extless = await resolveLinkedDocument(doc, './guide#start', docs);
+  assert.equal(extless.path, await fs.realpath(path.join(docs, 'guide.md')));
+  assert.equal(extless.fragment, 'start');
+  const extlessParent = await resolveLinkedDocument(childDoc, '../guide', docs);
+  assert.equal(extlessParent.path, await fs.realpath(path.join(docs, 'guide.md')));
+  const dottedExtless = await resolveLinkedDocument(doc, './v2.0#notes', docs);
+  assert.equal(dottedExtless.path, await fs.realpath(path.join(docs, 'v2.0.md')));
+  assert.equal(dottedExtless.fragment, 'notes');
+  await assert.rejects(resolveLinkedDocument(childDoc, '../../outside', docs), /outside/);
 
   // Sibling upward link is rejected without a folder boundary, but allowed when bounded by docs/.
   await assert.rejects(resolveLinkedDocument(childDoc, '../guide.md'), /outside/);
@@ -75,9 +101,13 @@ test('image and linked-document references stay within authorized folder boundar
   }
 
   // Windows junctions do not require elevated symlink privileges.
+  await fs.writeFile(path.join(dir, 'README.md'), '# Outside Root');
   await fs.symlink(dir, path.join(docs, 'escape'), 'junction');
   await assert.rejects(resolveImage(doc, 'escape/private.png'), /outside/);
+  await assert.rejects(resolveImage(childDoc, '../escape/private.png', docs), /outside/);
   await assert.rejects(resolveLinkedDocument(doc, 'escape/outside.md', docs), /escapes|outside/);
+  await assert.rejects(resolveLinkedDocument(doc, 'escape/', docs), /escapes|outside/);
+  await assert.rejects(resolveLinkedDocument(doc, 'escape/outside', docs), /escapes|outside/);
 });
 
 test('read-only folder walker respects bounds and skips ignored/hidden directories', async t => {
