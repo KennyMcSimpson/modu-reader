@@ -1,8 +1,10 @@
 # Public Bilingual Release Implementation Plan
 
+> Historical implementation plan from 2026-09-15 (when Inkglass was known as MoDu Reader).
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Turn the existing offline Markdown reader into a polished public MIT repository with a bilingual UI and bilingual documentation, while retaining the standalone `墨读.html` distribution.
+**Goal:** Turn the existing offline Markdown reader into a polished public MIT repository with a bilingual UI and bilingual documentation, while retaining the standalone legacy MoDu HTML bundle distribution.
 
 **Architecture:** Keep the current React/Vite source tree and local-only document pipeline. Add a typed, component-local translation dictionary in `reader.tsx`, pass locale-aware copy into `MarkdownDocument`, and persist only UI preferences. Keep repository-level release files separate from application code so the root offline artifact remains usable without Node.js.
 
@@ -13,7 +15,7 @@
 - Public repository: `KennyMcSimpson/modu-reader`.
 - License: standard MIT license, copyright `KennyMcSimpson`, year `2026`.
 - The application remains local-only; no upload, account, analytics, or server storage is added.
-- The root `墨读.html` remains a checked-in, directly launchable offline artifact.
+- The root legacy MoDu HTML bundle remains a checked-in, directly launchable offline artifact.
 - `source/dist/` remains generated and ignored; the checked-in root artifact is not ignored.
 - Do not add runtime dependencies for localization or visual styling.
 - Do not change supported input formats, encoding behavior, size limits, Markdown parsing, Mermaid, KaTeX, or local image handling.
@@ -29,7 +31,7 @@
 - Create: `LICENSE`
 - Create: `.gitignore`
 - Create: `CONTRIBUTING.md`
-- Modify: `使用说明.txt`
+- Modify: legacy root usage guide
 - Modify: `source/README.md`
 - Modify: `source/package.json`
 - Modify: `source/index.html`
@@ -41,7 +43,7 @@
 
 - [ ] **Step 1: Write the root README.**
 
-  Include paired Chinese and English sections for the product description, offline usage, supported formats, privacy promise, source development, build command, repository layout, third-party notices, and MIT license. Link to `source/README.md`, `使用说明.txt`, `LICENSE`, and `THIRD_PARTY_NOTICES/`. State that the checked-in `墨读.html` can be opened after extracting the repository archive.
+  Include paired Chinese and English sections for the product description, offline usage, supported formats, privacy promise, source development, build command, repository layout, third-party notices, and MIT license. Link to `source/README.md`, the legacy root usage guide, `LICENSE`, and `THIRD_PARTY_NOTICES/`. State that the checked-in legacy single-file HTML artifact can be opened after extracting the repository archive.
 
 - [ ] **Step 2: Add the standard MIT license.**
 
@@ -49,7 +51,7 @@
 
 - [ ] **Step 3: Add repository hygiene files.**
 
-  Make `.gitignore` ignore `source/node_modules/`, `source/dist/`, `*.tsbuildinfo`, `.sites-runtime/`, `.env`, `.env.*`, and editor/OS metadata. Do not ignore the root `墨读.html`, sample document, third-party notices, or source lockfile. Make `CONTRIBUTING.md` bilingual and describe issue reports, local validation, and the local-only privacy boundary.
+  Make `.gitignore` ignore `source/node_modules/`, `source/dist/`, `*.tsbuildinfo`, `.sites-runtime/`, `.env`, `.env.*`, and editor/OS metadata. Do not ignore the root legacy MoDu HTML bundle, sample document, third-party notices, or source lockfile. Make `CONTRIBUTING.md` bilingual and describe issue reports, local validation, and the local-only privacy boundary.
 
 - [ ] **Step 4: Rewrite the two existing guides bilingually.**
 
@@ -67,16 +69,18 @@
   "keywords": ["markdown", "reader", "offline", "local-first", "react", "vite"]
   ```
 
-  Keep all existing dependency and script versions. Update `source/index.html` with `lang="zh-CN"`, a bilingual title such as `墨读 MoDu Reader · Offline Markdown Reader`, and a short description meta tag.
+  Keep all existing dependency and script versions. Update `source/index.html` with `lang="zh-CN"`, a bilingual title combining the legacy Chinese brand name with `MoDu Reader · Offline Markdown Reader`, and a short description meta tag.
 
 - [ ] **Step 6: Verify documentation and metadata.**
 
   Run:
 
   ```powershell
-  rg -n "MIT|KennyMcSimpson|modu-reader|pnpm|offline|离线|双击|local-only|本地" README.md LICENSE CONTRIBUTING.md 使用说明.txt source/README.md source/package.json source/index.html
+  rg -n "MIT|KennyMcSimpson|modu-reader|pnpm|offline|local-only" README.md LICENSE CONTRIBUTING.md source/README.md source/package.json source/index.html
   git diff --check
   ```
+
+  (In the original bilingual release, this check also scanned the legacy root usage guide and localized offline keywords.)
 
   Expected: each public entry point contains the required repository, license, and offline-use references, and `git diff --check` reports no whitespace errors.
 
@@ -100,7 +104,7 @@
 
 - [ ] **Step 3: Add the language switch control.**
 
-  Add a compact `LocaleSwitch` control with `中` and `EN` options, active state, `aria-label`, and tooltip labels. Place it in the sidebar footer beside the theme controls, give it a stable class name, and update only locale state on click. The active document, scroll positions, theme, reading settings, and focus mode must remain untouched.
+  Add a compact `LocaleSwitch` control with Chinese and `EN` options, active state, `aria-label`, and tooltip labels. Place it in the sidebar footer beside the theme controls, give it a stable class name, and update only locale state on click. The active document, scroll positions, theme, reading settings, and focus mode must remain untouched.
 
 - [ ] **Step 4: Replace reader-owned literal copy.**
 
@@ -115,7 +119,7 @@
   Run:
 
   ```powershell
-  rg -n "[\u4e00-\u9fff]|READING GUIDE|MARKDOWN READER|复制|打开文件|Paste|Open file|Copy" source/components/reader.tsx source/components/markdown-document.tsx
+  rg -n "[\u4e00-\u9fff]|READING GUIDE|MARKDOWN READER|Paste|Open file|Copy" source/components/reader.tsx source/components/markdown-document.tsx
   pnpm run typecheck
   ```
 
@@ -135,7 +139,7 @@
 
 - [ ] **Step 1: Add bilingual brand structure and locale classes.**
 
-  Render the brand name as `墨读` with a secondary `MoDu Reader` line and a short bilingual descriptor. Render locale controls using `.locale-switch`, `.locale-option`, and `.locale-option.is-active` classes. Keep all controls keyboard focusable and use the existing icon/button conventions.
+  Render the legacy Chinese brand name with a secondary `MoDu Reader` line and a short bilingual descriptor. Render locale controls using `.locale-switch`, `.locale-option`, and `.locale-option.is-active` classes. Keep all controls keyboard focusable and use the existing icon/button conventions.
 
 - [ ] **Step 2: Tune stable dimensions and spacing.**
 
@@ -147,7 +151,7 @@
 
 - [ ] **Step 4: Update browser-facing branding.**
 
-  Keep the favicon as a simple existing local SVG asset, but align its label/title metadata with `墨读 MoDu Reader`. Do not introduce remote fonts, remote images, or network-required assets.
+  Keep the favicon as a simple existing local SVG asset, aligning its label/title metadata with the bilingual `MoDu Reader` brand lockup. Do not introduce remote fonts, remote images, or network-required assets.
 
 - [ ] **Step 5: Verify visual source constraints.**
 
@@ -164,11 +168,11 @@
 
 **Files:**
 - Modify: `source/lib/demo.ts`
-- Modify: root `墨读.html`
+- Modify: root legacy MoDu HTML bundle
 
 **Interfaces:**
 - `source/lib/demo.ts` continues to export `welcome` and `formatGuide` as Markdown strings.
-- `source/scripts/build-offline.mjs` continues to produce `source/dist/墨读.html`; the root artifact is updated from that build output.
+- `source/scripts/build-offline.mjs` continues to produce the legacy single-file HTML artifact under `source/dist/`; the root artifact is updated from that build output.
 
 - [ ] **Step 1: Add concise bilingual sample headings and guidance.**
 
@@ -183,19 +187,19 @@
   pnpm run build
   ```
 
-  Expected: the build exits with code 0 and writes a non-empty `source/dist/墨读.html`.
+  Expected: the build exits with code 0 and writes a non-empty legacy single-file HTML artifact in `source/dist/`.
 
 - [ ] **Step 3: Replace the root offline artifact.**
 
-  After confirming the generated file exists and is inside the project, copy `source/dist/墨读.html` to the root `墨读.html`. Do not copy `node_modules/` or `source/dist/` into Git tracking.
+  After confirming the generated file exists and is inside the project, copy the generated legacy single-file HTML artifact from `source/dist/` to the repository root. Do not copy `node_modules/` or `source/dist/` into Git tracking.
 
 - [ ] **Step 4: Verify the artifact boundary.**
 
-  Run:
+  Run (replacing `<legacy-bundle.html>` with the legacy single-file HTML artifact path):
 
   ```powershell
-  Get-Item 墨读.html, source/dist/墨读.html | Select-Object FullName,Length
-  rg -n "墨读|MoDu|modu-locale|English|中文" 墨读.html | Select-Object -First 20
+  Get-Item <legacy-bundle.html>, source/dist/<legacy-bundle.html> | Select-Object FullName,Length
+  rg -n "MoDu|modu-locale|English" <legacy-bundle.html> | Select-Object -First 20
   git status --short --ignored
   ```
 
@@ -227,7 +231,7 @@
 
 - [ ] **Step 3: Check desktop reader behavior.**
 
-  Open the local URL and verify the welcome document renders, switch `中` to `EN`, confirm the active document and reading position remain, open reader settings, switch theme, switch to source view, open the table of contents, and return to read view. Confirm all visible controls and toasts use English after switching.
+  Open the local URL and verify the welcome document renders, switch from Chinese to `EN`, confirm the active document and reading position remain, open reader settings, switch theme, switch to source view, open the table of contents, and return to read view. Confirm all visible controls and toasts use English after switching.
 
 - [ ] **Step 4: Check locale persistence and mobile layout.**
 
@@ -291,4 +295,4 @@
   git ls-remote --heads origin main
   ```
 
- Expected: visibility is `PUBLIC`, the default branch is `main`, the repository URL is the new public URL, the MIT license is visible, and the remote `main` ref resolves to the local release commit.
+  Expected: visibility is `PUBLIC`, the default branch is `main`, the repository URL is the new public URL, the MIT license is visible, and the remote `main` ref resolves to the local release commit.

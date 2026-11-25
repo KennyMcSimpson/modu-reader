@@ -1,5 +1,7 @@
 # MoDu Reader Public Bilingual Release Design
 
+> Historical design spec from 2026-09-15 (when Inkglass was known as MoDu Reader).
+
 **Status:** Approved direction, pending written-spec review
 **Date:** 2026-09-15
 **Repository:** `KennyMcSimpson/modu-reader`
@@ -13,7 +15,7 @@ Publish MoDu Reader as a public MIT-licensed repository that is understandable t
 ### In scope
 
 - Create a public GitHub repository named `modu-reader`.
-- Preserve `墨读.html` as a directly launchable offline distribution artifact.
+- Preserve the legacy MoDu HTML bundle as a directly launchable offline distribution artifact.
 - Keep `source/` as the editable React/Vite project and make its package metadata suitable for a public repository.
 - Add a bilingual application language switch with persisted preference and browser-language defaulting.
 - Translate visible interface copy, transient messages, settings labels, empty states, keyboard hints, and accessibility labels.
@@ -35,9 +37,9 @@ The repository root will contain the user-facing offline bundle, sample material
 
 ```text
 modu-reader/
-  墨读.html
-  示例文档.md
-  使用说明.txt
+  <legacy-single-file-html-bundle>.html
+  <legacy-sample-document>.md
+  <legacy-usage-guide>.txt
   README.md
   LICENSE
   THIRD_PARTY_NOTICES/
@@ -53,7 +55,7 @@ modu-reader/
   docs/superpowers/plans/
 ```
 
-The repository keeps the original distribution layout so a non-developer can download the repository archive, extract it, and open `墨读.html`. The source project remains independently buildable from `source/`.
+The repository keeps the original distribution layout so a non-developer can download the repository archive, extract it, and open the legacy single-file HTML artifact. The source project remains independently buildable from `source/`.
 
 ## Application Design
 
@@ -90,7 +92,7 @@ Dynamic values such as filenames, counts, sizes, and percentages remain interpol
 
 Retain the existing quiet editorial reader palette and component geometry, then make these bounded refinements:
 
-- present `墨读` with `MoDu Reader` as a bilingual brand lockup;
+- present the legacy Chinese brand mark alongside `MoDu Reader` as a bilingual brand lockup;
 - use a short bilingual product descriptor in the sidebar instead of an English-only all-caps label;
 - style the locale switch as a compact segmented control that remains usable on narrow screens;
 - align the topbar controls and reading status around stable dimensions so translations do not shift layout;
@@ -102,7 +104,7 @@ No decorative hero, marketing landing page, or extra card layer is introduced. T
 ## Documentation and Licensing
 
 - `README.md` presents the project in Chinese and English, with a short product description, screenshots-free usage steps, feature list, privacy statement, source development commands, and license/third-party notice links.
-- `使用说明.txt` remains easy to open for existing users and is rewritten with paired Chinese/English sections.
+- The legacy root usage guide remains easy to open for existing users and is rewritten with paired Chinese/English sections.
 - `source/README.md` documents Node.js and pnpm requirements, development, typecheck, offline build, and file responsibilities in both languages.
 - `LICENSE` contains the standard MIT text with copyright holder `KennyMcSimpson` and year `2026`.
 - `.gitignore` covers dependencies, generated `source/dist`, local environment files, and tool caches without excluding the checked-in offline bundle.
@@ -133,8 +135,8 @@ Run from `source/`:
 
 Then verify:
 
-- `source/dist/墨读.html` exists and is non-empty after build.
-- the root `墨读.html` remains present and opens as a standalone HTML document;
+- the generated legacy single-file HTML artifact in `source/dist/` exists and is non-empty after build;
+- the root legacy MoDu HTML bundle remains present and opens as a standalone HTML document;
 - the development reader can switch between Chinese and English without losing the active document or settings;
 - the language preference survives a reload;
 - file picker, paste dialog, drag-and-drop overlay, read/source tabs, table of contents, focus mode, theme controls, and settings remain usable in both locales;
@@ -149,4 +151,3 @@ Then verify:
 4. Initialize the repository, review the final diff and tracked file list, and create a release commit.
 5. Create `KennyMcSimpson/modu-reader` as a public GitHub repository with the MIT license metadata and push the release commit.
 6. Verify the remote repository visibility, default branch, tracked license, README, and source/build instructions.
-
